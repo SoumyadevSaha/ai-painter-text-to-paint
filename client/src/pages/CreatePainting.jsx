@@ -20,6 +20,7 @@ const CreatePainting = () => {
     if(form.prompt) {
       try {
         setGeneratingImg(true);
+        // const response = await fetch('https://ai-painter-backend.onrender.com/api/v1/dalle', {
         const response = await fetch('http://localhost:8080/api/v1/dalle', {
           method: 'POST',
           headers: {
@@ -28,7 +29,8 @@ const CreatePainting = () => {
           body: JSON.stringify({ prompt: form.prompt }),
         });
         const data = await response.json();
-        setForm({...form, photo: `data:image/jpeg;base64,${data.photo}` });
+        // setForm({...form, photo: `data:image/jpeg;base64,${data.photo}` });
+        setForm({...form, photo: `${data.photo}` });
 
       } catch (error) {
         alert(error);
@@ -46,6 +48,7 @@ const CreatePainting = () => {
       setLoading(true);
 
       try {
+        // const response = await fetch('https://ai-painter-backend.onrender.com/api/v1/post', {
         const response = await fetch('http://localhost:8080/api/v1/post', {
           method: 'POST',
           headers: {
@@ -120,7 +123,7 @@ const CreatePainting = () => {
             ) : (
               <img 
                 src={preview}
-                className='w-9/12 h-9/12 object-contain opacity-40'
+                className='w-9/12 h-9/12 object-contain opacity-80'
               />
             )}
 
