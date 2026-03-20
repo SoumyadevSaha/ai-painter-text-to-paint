@@ -74,6 +74,29 @@ test('health endpoint reports local-json fallback mode', { concurrency: false },
     }
 });
 
+test('swagger documentation endpoints are available', { concurrency: false }, async () => {
+    const { baseUrl, cleanup } = await makeServer();
+
+    try {
+        const jsonResponse = await fetch(`${baseUrl}/api-docs.json`);
+        const jsonPayload = await jsonResponse.json();
+
+        assert.equal(jsonResponse.status, 200);
+        assert.equal(jsonPayload.info.title, 'VinciForge API');
+        assert.ok(jsonPayload.paths['/api/v1/auth/register']);
+        assert.ok(jsonPayload.paths['/api/v1/post']);
+
+        const htmlResponse = await fetch(`${baseUrl}/api-docs/`);
+        const html = await htmlResponse.text();
+
+        assert.equal(htmlResponse.status, 200);
+        assert.match(html, /VinciForge API Docs/i);
+        assert.match(html, /swagger-ui/i);
+    } finally {
+        await cleanup();
+    }
+});
+
 test('auth register and login return a JWT-backed session', { concurrency: false }, async () => {
     const { baseUrl, cleanup, usersFile } = await makeServer();
 
@@ -162,6 +185,80 @@ test('authenticated user can save private work and publish it later', { concurre
         const storedFile = await readFile(postsFile, 'utf8');
         assert.match(storedFile, /A cinematic monsoon skyline/);
         assert.match(storedFile, /"isCommunity": true/);
+    } finally {
+        await cleanup();
+    }
+});
+
+test('signed-in users can like or dislike a community post with one active reaction', { concurrency: false }, async () => {
+    const { baseUrl, cleanup } = await makeServer();
+
+    try {
+        const { payload: owner } = await registerUser(baseUrl);
+        const { payload: viewer } = await registerUser(baseUrl, {
+            email: 'viewer@example.com',
+            name: 'Viewer',
+        });
+
+        const ownerHeaders = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${owner.token}`,
+        };
+
+        const createResponse = await fetch(`${baseUrl}/api/v1/post`, {
+            method: 'POST',
+            headers: ownerHeaders,
+            body: JSON.stringify({
+                prompt: 'A public reaction test image',
+                photo: 'data:image/svg+xml;base64,PHN2Zy8+',
+                isCommunity: true,
+            }),
+        });
+
+        const createdPayload = await createResponse.json();
+        assert.equal(createResponse.status, 201);
+
+        const reactionResponse = await fetch(`${baseUrl}/api/v1/post/${createdPayload.data._id}/reaction`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${viewer.token}`,
+            },
+            body: JSON.stringify({ reaction: 'like' }),
+        });
+
+        const likedPayload = await reactionResponse.json();
+        assert.equal(reactionResponse.status, 200);
+        assert.equal(likedPayload.data.likeCount, 1);
+        assert.equal(likedPayload.data.dislikeCount, 0);
+        assert.equal(likedPayload.data.viewerReaction, 'like');
+
+        const switchResponse = await fetch(`${baseUrl}/api/v1/post/${createdPayload.data._id}/reaction`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${viewer.token}`,
+            },
+            body: JSON.stringify({ reaction: 'dislike' }),
+        });
+
+        const dislikedPayload = await switchResponse.json();
+        assert.equal(switchResponse.status, 200);
+        assert.equal(dislikedPayload.data.likeCount, 0);
+        assert.equal(dislikedPayload.data.dislikeCount, 1);
+        assert.equal(dislikedPayload.data.viewerReaction, 'dislike');
+
+        const listResponse = await fetch(`${baseUrl}/api/v1/post`, {
+            headers: {
+                Authorization: `Bearer ${viewer.token}`,
+            },
+        });
+        const listPayload = await listResponse.json();
+
+        assert.equal(listResponse.status, 200);
+        assert.equal(listPayload.data[0].viewerReaction, 'dislike');
+        assert.equal(listPayload.data[0].likeCount, 0);
+        assert.equal(listPayload.data[0].dislikeCount, 1);
     } finally {
         await cleanup();
     }

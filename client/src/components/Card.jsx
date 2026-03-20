@@ -9,6 +9,13 @@ const Card = ({
   prompt,
   photo,
   badgeText = 'Community Pick',
+  likeCount = 0,
+  dislikeCount = 0,
+  viewerReaction = null,
+  showReactionSummary = false,
+  showReactionControls = false,
+  reactionDisabled = false,
+  onReact,
   actionLabel,
   actionDisabled = false,
   onAction,
@@ -33,6 +40,47 @@ const Card = ({
         <p className='prompt max-h-24 overflow-y-auto text-sm leading-6 text-white/92'>
           {prompt}
         </p>
+
+        {showReactionSummary && (
+          <div className='mt-4 flex flex-wrap items-center gap-2'>
+            <span className='rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/92 backdrop-blur-sm'>
+              Like {likeCount}
+            </span>
+            <span className='rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/92 backdrop-blur-sm'>
+              Dislike {dislikeCount}
+            </span>
+          </div>
+        )}
+
+        {showReactionControls && (
+          <div className='mt-4 flex flex-wrap items-center gap-2'>
+            <button
+              type='button'
+              onClick={() => onReact?.('like')}
+              disabled={reactionDisabled}
+              className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
+                viewerReaction === 'like'
+                  ? 'bg-[#ffb347] text-[#1b2235]'
+                  : 'bg-white/16 text-white hover:bg-white/24'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {reactionDisabled && viewerReaction === 'like' ? 'Updating...' : `Like ${likeCount}`}
+            </button>
+
+            <button
+              type='button'
+              onClick={() => onReact?.('dislike')}
+              disabled={reactionDisabled}
+              className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
+                viewerReaction === 'dislike'
+                  ? 'bg-[#f08a6c] text-white'
+                  : 'bg-white/16 text-white hover:bg-white/24'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {reactionDisabled && viewerReaction === 'dislike' ? 'Updating...' : `Dislike ${dislikeCount}`}
+            </button>
+          </div>
+        )}
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

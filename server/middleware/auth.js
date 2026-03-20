@@ -3,34 +3,58 @@ import { isMongoReady } from '../mongodb/connect.js';
 import { findLocalUserById } from '../storage/localUsersStore.js';
 import { verifyAuthToken } from '../utils/jwt.js';
 
+const getBearerToken = (req) => {
+    const authorizationHeader = req.headers.authorization || '';
+    const [, token] = authorizationHeader.split(' ');
+    return token || null;
+};
+
+const resolveRequestUser = async (req) => {
+    const token = getBearerToken(req);
+
+    if (!token) {
+        return null;
+    }
+
+    const payload = verifyAuthToken(token);
+    const user = isMongoReady()
+        ? await User.findById(payload.sub)
+        : await findLocalUserById(payload.sub);
+
+    if (!user) {
+        throw new Error('Invalid token');
+    }
+
+    return {
+        _id: user._id?.toString?.() || user._id,
+        name: user.name,
+        email: user.email,
+    };
+};
+
 const requireAuth = async (req, res, next) => {
     try {
-        const authorizationHeader = req.headers.authorization || '';
-        const [, token] = authorizationHeader.split(' ');
+        const user = await resolveRequestUser(req);
 
-        if (!token) {
+        if (!user) {
             return res.status(401).json({ success: false, message: 'Authentication required' });
         }
 
-        const payload = verifyAuthToken(token);
-        const user = isMongoReady()
-            ? await User.findById(payload.sub)
-            : await findLocalUserById(payload.sub);
-
-        if (!user) {
-            return res.status(401).json({ success: false, message: 'Invalid token' });
-        }
-
-        req.user = {
-            _id: user._id?.toString?.() || user._id,
-            name: user.name,
-            email: user.email,
-        };
-
+        req.user = user;
         next();
     } catch {
         return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 };
 
-export { requireAuth };
+const optionalAuth = async (req, res, next) => {
+    try {
+        req.user = await resolveRequestUser(req);
+    } catch {
+        req.user = null;
+    }
+
+    next();
+};
+
+export { optionalAuth, requireAuth };

@@ -3,13 +3,14 @@ import * as dotenv from 'dotenv';
 import { v2 as cloudinary } from 'cloudinary';
 
 import { isMongoReady } from '../mongodb/connect.js';
-import { requireAuth } from '../middleware/auth.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import Post from '../mongodb/models/post.js';
 import {
     createLocalPost,
     getCommunityPosts,
     getUserPosts,
     updateLocalPostCommunityState,
+    updateLocalPostReaction,
 } from '../storage/localPostsStore.js';
 
 dotenv.config();
@@ -48,6 +49,21 @@ const estimateSourceImageBytes = (photo) => {
     return Buffer.byteLength(photo, 'utf8');
 };
 
+const serializePost = (post, viewerId = null) => {
+    const postObject = post?.toObject ? post.toObject() : { ...post };
+    const reactions = Array.isArray(postObject.reactions) ? postObject.reactions : [];
+    const viewerReaction = viewerId
+        ? reactions.find((reaction) => reaction.userId === viewerId)?.value || null
+        : null;
+
+    return {
+        ...postObject,
+        likeCount: reactions.filter((reaction) => reaction.value === 'like').length,
+        dislikeCount: reactions.filter((reaction) => reaction.value === 'dislike').length,
+        viewerReaction,
+    };
+};
+
 if (isCloudinaryConfigured()) {
     cloudinary.config({
         cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -56,13 +72,17 @@ if (isCloudinaryConfigured()) {
     });
 }
 
-router.route('/').get(async (req, res) => {
+router.route('/').get(optionalAuth, async (req, res) => {
     try {
         const posts = isMongoReady()
             ? await Post.find({ isCommunity: true }).sort({ createdAt: -1 })
             : await getCommunityPosts();
 
-        res.status(200).json({ success: true, message: 'Community posts', data: posts });
+        res.status(200).json({
+            success: true,
+            message: 'Community posts',
+            data: posts.map((post) => serializePost(post, req.user?._id || null)),
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load posts', error: error.message });
     }
@@ -74,7 +94,11 @@ router.get('/mine', requireAuth, async (req, res) => {
             ? await Post.find({ userId: req.user._id }).sort({ createdAt: -1 })
             : await getUserPosts(req.user._id);
 
-        res.status(200).json({ success: true, message: 'Your posts', data: posts });
+        res.status(200).json({
+            success: true,
+            message: 'Your posts',
+            data: posts.map((post) => serializePost(post, req.user._id)),
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load your posts', error: error.message });
     }
@@ -97,6 +121,7 @@ router.route('/').post(requireAuth, async (req, res) => {
             prompt: prompt.trim(),
             photo: photo.trim(),
             isCommunity: Boolean(isCommunity),
+            reactions: [],
         };
 
         const sourceImageBytes = estimateSourceImageBytes(normalizedPost.photo);
@@ -133,7 +158,11 @@ router.route('/').post(requireAuth, async (req, res) => {
                 photo: storedPhoto,
             });
 
-        res.status(201).json({ success: true, message: 'Post created successfully', data: newPost });
+        res.status(201).json({
+            success: true,
+            message: 'Post created successfully',
+            data: serializePost(newPost, req.user._id),
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to create post', error: error.message });
     }
@@ -164,9 +193,70 @@ router.patch('/:postId/community', requireAuth, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Post not found' });
         }
 
-        res.status(200).json({ success: true, message: 'Post visibility updated', data: updatedPost });
+        res.status(200).json({
+            success: true,
+            message: 'Post visibility updated',
+            data: serializePost(updatedPost, req.user._id),
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update post visibility', error: error.message });
+    }
+});
+
+router.post('/:postId/reaction', requireAuth, async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { reaction } = req.body;
+
+        if (![null, 'like', 'dislike'].includes(reaction)) {
+            return res.status(400).json({
+                success: false,
+                message: 'reaction must be one of: like, dislike, or null',
+            });
+        }
+
+        let updatedPost;
+
+        if (isMongoReady()) {
+            const post = await Post.findOne({ _id: postId, isCommunity: true });
+
+            if (!post) {
+                return res.status(404).json({ success: false, message: 'Community post not found' });
+            }
+
+            const existingReactionIndex = post.reactions.findIndex((item) => item.userId === req.user._id);
+
+            if (!reaction) {
+                if (existingReactionIndex !== -1) {
+                    post.reactions.splice(existingReactionIndex, 1);
+                }
+            } else if (existingReactionIndex === -1) {
+                post.reactions.push({ userId: req.user._id, value: reaction });
+            } else {
+                post.reactions[existingReactionIndex] = { userId: req.user._id, value: reaction };
+            }
+
+            await post.save();
+            updatedPost = post;
+        } else {
+            updatedPost = await updateLocalPostReaction({
+                postId,
+                userId: req.user._id,
+                reaction,
+            });
+
+            if (!updatedPost) {
+                return res.status(404).json({ success: false, message: 'Community post not found' });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Reaction updated',
+            data: serializePost(updatedPost, req.user._id),
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to update reaction', error: error.message });
     }
 });
 

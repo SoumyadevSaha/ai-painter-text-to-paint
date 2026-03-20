@@ -73,6 +73,7 @@ const createLocalPost = async (post) => {
     const newPost = {
         _id: randomUUID(),
         ...post,
+        reactions: Array.isArray(post.reactions) ? post.reactions : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
@@ -101,4 +102,42 @@ const updateLocalPostCommunityState = async ({ postId, userId, isCommunity }) =>
     return posts[postIndex];
 };
 
-export { createLocalPost, getCommunityPosts, getLocalPosts, getUserPosts, updateLocalPostCommunityState };
+const updateLocalPostReaction = async ({ postId, userId, reaction }) => {
+    const posts = await readPosts();
+    const postIndex = posts.findIndex((post) => post._id === postId && post.isCommunity);
+
+    if (postIndex === -1) {
+        return null;
+    }
+
+    const reactions = Array.isArray(posts[postIndex].reactions) ? [...posts[postIndex].reactions] : [];
+    const existingReactionIndex = reactions.findIndex((item) => item.userId === userId);
+
+    if (!reaction) {
+        if (existingReactionIndex !== -1) {
+            reactions.splice(existingReactionIndex, 1);
+        }
+    } else if (existingReactionIndex === -1) {
+        reactions.push({ userId, value: reaction });
+    } else {
+        reactions[existingReactionIndex] = { userId, value: reaction };
+    }
+
+    posts[postIndex] = {
+        ...posts[postIndex],
+        reactions,
+        updatedAt: new Date().toISOString(),
+    };
+
+    await writePosts(posts);
+    return posts[postIndex];
+};
+
+export {
+    createLocalPost,
+    getCommunityPosts,
+    getLocalPosts,
+    getUserPosts,
+    updateLocalPostCommunityState,
+    updateLocalPostReaction,
+};
