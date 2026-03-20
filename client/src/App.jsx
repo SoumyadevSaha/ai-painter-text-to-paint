@@ -25,7 +25,7 @@ const AppLayout = () => {
           <NavLink to='/' className='flex items-center gap-3 sm:gap-4'>
             <img
               src={logo}
-              alt='AI Painter logo'
+              alt='VinciForge logo'
               className='h-16 w-auto object-contain drop-shadow-[0_16px_26px_rgba(27,34,53,0.12)] sm:h-20 lg:h-24'
             />
           </NavLink>

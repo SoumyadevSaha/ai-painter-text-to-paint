@@ -20,7 +20,7 @@ app.use('/api/v1/dalle', dalleRoutes);
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'AI Painter API is running',
+        message: 'VinciForge API is running',
         mongoConnected: isMongoReady(),
     });
 });
