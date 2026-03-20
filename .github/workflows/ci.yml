@@ -32,7 +32,6 @@ jobs:
         run: npm test
 
   server-mongo-tests:
-    if: ${{ secrets.MONGODB_TEST_URI != '' }}
     runs-on: ubuntu-latest
 
     defaults:
