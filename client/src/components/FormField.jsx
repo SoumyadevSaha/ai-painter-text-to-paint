@@ -1,36 +1,41 @@
-import React from 'react'
+import React from 'react';
 
 const FormField = ({ labelName, type, name, placeholder, value, handleChange, isSurpriseMe, handleSurpriseMe }) => {
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
+    <div className='space-y-3'>
+      <div className="flex flex-wrap items-center gap-2">
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-gray-900"
+          className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#586578]"
         >
           {labelName}
         </label>
 
         {isSurpriseMe && (
-          <button type='button' onClick={handleSurpriseMe} className='font-semibold text-xs bg-[#c8c8cb] py-1 px-2 rounded-[5px] text-black hover:shadow-md'>
+          <button
+            type='button'
+            onClick={handleSurpriseMe}
+            className='btn-ghost rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]'
+          >
             Surprise me
           </button>
         )}
       </div>
 
-      <input 
-        type={type}
-        id={name}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={handleChange}
-        required
-        className="shadow-sm border bg-gray-50 border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-3 outline-none 
-        hover:shadow-lg hover:border-none"
-      />
+      <div className='field-surface rounded-[22px] px-4 py-1.5 transition duration-200'>
+        <input 
+          type={type}
+          id={name}
+          name={name}
+          placeholder={placeholder}
+          value={value}
+          onChange={handleChange}
+          required
+          className="block w-full bg-transparent px-0 py-3 text-[15px] text-[#1b2235] outline-none placeholder:text-[#8c8a86]"
+        />
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default FormField
+export default FormField;
