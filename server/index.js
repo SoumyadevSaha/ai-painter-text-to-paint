@@ -2,8 +2,10 @@ import express from 'express';
 import * as dotenv from 'dotenv';
 import cors from 'cors';
 import { pathToFileURL } from 'url';
+import swaggerUi from 'swagger-ui-express';
 
 import connectDB, { isMongoReady } from './mongodb/connect.js';
+import { getOpenApiSpec } from './docs/openapi.js';
 import authRoutes from './routes/authRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import dalleRoutes from './routes/dalleRoutes.js';
@@ -11,8 +13,18 @@ import dalleRoutes from './routes/dalleRoutes.js';
 dotenv.config();
 
 const app = express();
+const openApiSpec = getOpenApiSpec();
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+app.get('/api-docs.json', (req, res) => {
+    res.json(openApiSpec);
+});
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'VinciForge API Docs',
+}));
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/post', postRoutes);

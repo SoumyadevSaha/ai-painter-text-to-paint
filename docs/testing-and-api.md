@@ -34,6 +34,13 @@ npm run build
 
 ## API Overview
 
+Interactive API docs are available from the server at:
+
+```text
+GET /api-docs
+GET /api-docs.json
+```
+
 ### Health and Status
 
 ```text
@@ -56,6 +63,7 @@ GET /api/v1/post
 GET /api/v1/post/mine
 POST /api/v1/post
 PATCH /api/v1/post/:postId/community
+POST /api/v1/post/:postId/reaction
 ```
 
 ### Image Generation

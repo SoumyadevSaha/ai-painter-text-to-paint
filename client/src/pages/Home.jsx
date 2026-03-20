@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from 'react';
 
 import { Card, FormField, Loader } from '../components';
+import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
 
-const RenderCards = ({ data, title }) => {
+const RenderCards = ({
+  data,
+  title,
+  isAuthenticated,
+  reactingPostId,
+  onReact,
+}) => {
   if (data?.length > 0) {
-    return data.map((post) => <Card key={post._id} {...post} />);
+    return data.map((post) => (
+      <Card
+        key={post._id}
+        {...post}
+        showReactionSummary={true}
+        showReactionControls={isAuthenticated}
+        reactionDisabled={reactingPostId === post._id}
+        onReact={(reaction) => onReact(post, reaction)}
+      />
+    ));
   } else {
     return (
       <div className='glass-panel-strong rounded-[28px] px-6 py-10 text-center'>
@@ -19,11 +35,13 @@ const RenderCards = ({ data, title }) => {
 };
 
 const Home = () => {
+  const { authFetch, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [allPosts, setAllPosts] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [searchedResults, setSearchedResults] = useState([]);
   const [error, setError] = useState('');
+  const [reactingPostId, setReactingPostId] = useState('');
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -31,9 +49,9 @@ const Home = () => {
       setError('');
 
       try {
-        const response = await fetch(`${API_URL}/api/v1/post`, {
-          method: 'GET',
-        });
+        const response = isAuthenticated
+          ? await authFetch('/api/v1/post', { method: 'GET' })
+          : await fetch(`${API_URL}/api/v1/post`, { method: 'GET' });
 
         const data = await response.json();
 
@@ -49,7 +67,7 @@ const Home = () => {
     };
 
     fetchPosts();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -73,6 +91,41 @@ const Home = () => {
 
   const handleSearchChange = (e) => {
     setSearchText(e.target.value);
+  };
+
+  const handleReaction = async (post, nextReaction) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    setReactingPostId(post._id);
+    setError('');
+
+    try {
+      const response = await authFetch(`/api/v1/post/${post._id}/reaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reaction: post.viewerReaction === nextReaction ? null : nextReaction,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to update reaction');
+      }
+
+      setAllPosts((currentPosts) =>
+        currentPosts.map((item) => (item._id === post._id ? data.data : item))
+      );
+    } catch (reactionError) {
+      setError(reactionError.message);
+    } finally {
+      setReactingPostId('');
+    }
   };
 
   const stats = [
@@ -110,6 +163,12 @@ const Home = () => {
           <h2 className='font-display mt-4 text-3xl text-[#1b2235]'>Search by creator or prompt</h2>
           <p className='mt-3 text-sm leading-7 text-[#616b79]'>
             Narrow the board instantly and uncover the exact image style, aesthetic, or artist mood you want to revisit.
+          </p>
+
+          <p className='mt-3 text-sm leading-7 text-[#616b79]'>
+            {isAuthenticated
+              ? 'You can like or dislike any public artwork. Clicking the same reaction again removes it.'
+              : 'Public artwork is visible to everyone. Sign in to like or dislike community posts.'}
           </p>
 
           <div className='mt-6'>
@@ -155,9 +214,21 @@ const Home = () => {
 
             <div className='grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'>
               {searchText ? (
-                <RenderCards data={searchedResults} title='No search results found' />
+                <RenderCards
+                  data={searchedResults}
+                  title='No search results found'
+                  isAuthenticated={isAuthenticated}
+                  reactingPostId={reactingPostId}
+                  onReact={handleReaction}
+                />
               ) : (
-                <RenderCards data={allPosts} title='No posts found' />
+                <RenderCards
+                  data={allPosts}
+                  title='No posts found'
+                  isAuthenticated={isAuthenticated}
+                  reactingPostId={reactingPostId}
+                  onReact={handleReaction}
+                />
               )}
             </div>
           </>
