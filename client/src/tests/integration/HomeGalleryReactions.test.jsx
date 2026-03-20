@@ -1,6 +1,6 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Home from '../../pages/Home';
@@ -68,9 +68,9 @@ describe('Home gallery reactions', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole('button', { name: 'Like 2' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Like this artwork' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Like 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Like this artwork' }));
 
     await waitFor(() => {
       expect(authFetch).toHaveBeenNthCalledWith(2, '/api/v1/post/post-1/reaction', {
@@ -82,6 +82,8 @@ describe('Home gallery reactions', () => {
       });
     });
 
-    expect(await screen.findByRole('button', { name: 'Like 3' })).toBeInTheDocument();
+    const likeButton = await screen.findByRole('button', { name: 'Like this artwork' });
+    expect(likeButton).toHaveAttribute('aria-pressed', 'true');
+    expect(within(likeButton).getByText('3')).toBeInTheDocument();
   });
 });

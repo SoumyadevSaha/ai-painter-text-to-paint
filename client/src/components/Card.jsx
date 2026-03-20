@@ -1,6 +1,45 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { download } from '../assets';
 import { downloadImage } from '../utils';
+
+const ThumbUpIcon = ({ active = false }) => (
+  <svg
+    viewBox='0 0 24 24'
+    aria-hidden='true'
+    className={`h-4.5 w-4.5 ${active ? 'scale-110' : ''}`}
+    fill='none'
+    stroke='currentColor'
+    strokeWidth='1.9'
+    strokeLinecap='round'
+    strokeLinejoin='round'
+  >
+    <path d='M7 22V10' />
+    <path d='M14 10l1-5.2A2.1 2.1 0 0 0 12.9 2H12l-4 8v12h10.2a2 2 0 0 0 2-1.6l1.4-7.2A2 2 0 0 0 19.6 10H14z' />
+  </svg>
+);
+
+const ThumbDownIcon = ({ active = false }) => (
+  <svg
+    viewBox='0 0 24 24'
+    aria-hidden='true'
+    className={`h-4.5 w-4.5 ${active ? 'scale-110' : ''}`}
+    fill='none'
+    stroke='currentColor'
+    strokeWidth='1.9'
+    strokeLinecap='round'
+    strokeLinejoin='round'
+  >
+    <path d='M17 2v12' />
+    <path d='M10 14l-1 5.2A2.1 2.1 0 0 0 11.1 22H12l4-8V2H5.8a2 2 0 0 0-2 1.6L2.4 10.8A2 2 0 0 0 4.4 14H10z' />
+  </svg>
+);
+
+const ReactionPill = ({ icon, count }) => (
+  <span className='reaction-pill'>
+    {icon}
+    <span>{count}</span>
+  </span>
+);
 
 const Card = ({
   _id,
@@ -21,6 +60,24 @@ const Card = ({
   onAction,
 }) => {
   const displayName = ownerName || name || 'Artist';
+  const [animatingReaction, setAnimatingReaction] = useState('');
+
+  useEffect(() => {
+    if (!animatingReaction) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAnimatingReaction('');
+    }, 420);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [animatingReaction, viewerReaction, likeCount, dislikeCount]);
+
+  const handleReactionClick = (reaction) => {
+    setAnimatingReaction(reaction);
+    onReact?.(reaction);
+  };
 
   return (
     <article className='card-shell card group relative overflow-hidden rounded-[28px] p-3 transition duration-300 hover:-translate-y-1'>
@@ -43,12 +100,8 @@ const Card = ({
 
         {showReactionSummary && (
           <div className='mt-4 flex flex-wrap items-center gap-2'>
-            <span className='rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/92 backdrop-blur-sm'>
-              Like {likeCount}
-            </span>
-            <span className='rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/92 backdrop-blur-sm'>
-              Dislike {dislikeCount}
-            </span>
+            <ReactionPill icon={<ThumbUpIcon />} count={likeCount} />
+            <ReactionPill icon={<ThumbDownIcon />} count={dislikeCount} />
           </div>
         )}
 
@@ -56,28 +109,34 @@ const Card = ({
           <div className='mt-4 flex flex-wrap items-center gap-2'>
             <button
               type='button'
-              onClick={() => onReact?.('like')}
+              onClick={() => handleReactionClick('like')}
               disabled={reactionDisabled}
-              className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
+              aria-label='Like this artwork'
+              aria-pressed={viewerReaction === 'like'}
+              className={`reaction-button ${animatingReaction === 'like' ? 'reaction-burst' : ''} ${
                 viewerReaction === 'like'
-                  ? 'bg-[#ffb347] text-[#1b2235]'
-                  : 'bg-white/16 text-white hover:bg-white/24'
-              } disabled:cursor-not-allowed disabled:opacity-60`}
+                  ? 'reaction-button-like-active'
+                  : 'reaction-button-neutral'
+              }`}
             >
-              {reactionDisabled && viewerReaction === 'like' ? 'Updating...' : `Like ${likeCount}`}
+              <ThumbUpIcon active={viewerReaction === 'like'} />
+              <span className='reaction-count'>{likeCount}</span>
             </button>
 
             <button
               type='button'
-              onClick={() => onReact?.('dislike')}
+              onClick={() => handleReactionClick('dislike')}
               disabled={reactionDisabled}
-              className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
+              aria-label='Dislike this artwork'
+              aria-pressed={viewerReaction === 'dislike'}
+              className={`reaction-button ${animatingReaction === 'dislike' ? 'reaction-burst' : ''} ${
                 viewerReaction === 'dislike'
-                  ? 'bg-[#f08a6c] text-white'
-                  : 'bg-white/16 text-white hover:bg-white/24'
-              } disabled:cursor-not-allowed disabled:opacity-60`}
+                  ? 'reaction-button-dislike-active'
+                  : 'reaction-button-neutral'
+              }`}
             >
-              {reactionDisabled && viewerReaction === 'dislike' ? 'Updating...' : `Dislike ${dislikeCount}`}
+              <ThumbDownIcon active={viewerReaction === 'dislike'} />
+              <span className='reaction-count'>{dislikeCount}</span>
             </button>
           </div>
         )}
