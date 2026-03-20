@@ -1,11 +1,15 @@
 import mongoose from 'mongoose';
 
-const Post = new mongoose.Schema({
-    name: { type: String, required: true },
+const PostSchema = new mongoose.Schema({
+    userId: { type: String, required: true, index: true },
+    ownerName: { type: String, required: true },
     prompt: { type: String, required: true },
     photo: { type: String, required: true },
+    isCommunity: { type: Boolean, default: false },
+}, {
+    timestamps: true,
 });
 
-const PostSchema = mongoose.model('Post', Post);
+const Post = mongoose.models.Post || mongoose.model('Post', PostSchema);
 
-export default PostSchema;
+export default Post;

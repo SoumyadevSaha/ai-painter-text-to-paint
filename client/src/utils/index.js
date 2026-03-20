@@ -1,11 +1,11 @@
 import { surpriseMePrompts } from "../constants";
 import FileSaver from "file-saver";
 
-const getRandomPrompt = (propmt) => {
+const getRandomPrompt = (prompt) => {
     const randomIdx = Math.floor(Math.random() * surpriseMePrompts.length);
     const randomPrompt = surpriseMePrompts[randomIdx];
-    if (propmt === randomPrompt) {
-        return getRandomPrompt(propmt);
+    if (prompt === randomPrompt) {
+        return getRandomPrompt(prompt);
     }
 
     return randomPrompt;
