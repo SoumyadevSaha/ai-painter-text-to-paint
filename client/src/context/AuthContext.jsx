@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 
 import { API_URL } from '../config';
 
-const STORAGE_KEY = 'ai-painter-auth';
+const STORAGE_KEY = 'vinciforge-auth';
 const AuthContext = createContext(null);
 
 const readStoredSession = () => {

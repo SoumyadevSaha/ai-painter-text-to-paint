@@ -12,7 +12,7 @@ const getRandomPrompt = (prompt) => {
 }
 
 const downloadImage = async(_id, photo) => {
-    FileSaver.saveAs(photo, `download-${_id}-ai_painter_soumya.jpg`);
+    FileSaver.saveAs(photo, `download-${_id}-vinciforge-soumya.jpg`);
 }
 
 export { getRandomPrompt, downloadImage };
