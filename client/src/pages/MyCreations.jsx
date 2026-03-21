@@ -9,6 +9,7 @@ const MyCreations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingPostId, setUpdatingPostId] = useState('');
+  const [deletingPostId, setDeletingPostId] = useState('');
 
   const loadPosts = async () => {
     setLoading(true);
@@ -63,13 +64,36 @@ const MyCreations = () => {
     }
   };
 
+  const deletePost = async (postId) => {
+    setDeletingPostId(postId);
+    setError('');
+
+    try {
+      const response = await authFetch(`/api/v1/post/${postId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to delete post');
+      }
+
+      setPosts((currentPosts) => currentPosts.filter((item) => item._id !== postId));
+    } catch (deleteError) {
+      setError(deleteError.message);
+    } finally {
+      setDeletingPostId('');
+    }
+  };
+
   return (
     <section className='space-y-8 pb-6'>
       <div className='glass-panel-strong rounded-[34px] px-6 py-8 sm:px-8'>
         <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
           Your Studio
         </div>
-        <h1 className='font-display gradient-text mt-5 text-4xl leading-tight sm:text-5xl'>
+        <h1 className='font-display gradient-text mt-5 pb-1 text-4xl leading-[1.08] sm:text-5xl'>
           {user?.name ? `${user.name}'s creations` : 'Your creations'}
         </h1>
         <p className='mt-4 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
@@ -101,9 +125,13 @@ const MyCreations = () => {
               key={post._id}
               {...post}
               badgeText={post.isCommunity ? 'Public' : 'Private'}
-              actionLabel={post.isCommunity ? 'Remove from Community' : 'Share to Community'}
+              actionLabel={post.isCommunity ? 'Unshare' : 'Share'}
               actionDisabled={updatingPostId === post._id}
               onAction={() => toggleCommunityState(post)}
+              secondaryActionLabel='Delete'
+              secondaryActionDisabled={deletingPostId === post._id}
+              secondaryActionTone='danger'
+              onSecondaryAction={() => deletePost(post._id)}
             />
           ))}
         </div>

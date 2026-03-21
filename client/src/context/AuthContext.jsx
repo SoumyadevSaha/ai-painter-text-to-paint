@@ -101,6 +101,17 @@ const AuthProvider = ({ children }) => {
     });
   };
 
+  const performAuthenticatedAction = async (path, options = {}) => {
+    const response = await authFetch(path, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || 'Request failed');
+    }
+
+    return data;
+  };
+
   const value = useMemo(() => ({
     authReady,
     token: session?.token || null,
@@ -109,6 +120,23 @@ const AuthProvider = ({ children }) => {
     login: (payload) => authenticate('login', payload),
     register: (payload) => authenticate('register', payload),
     logout: () => updateSession(null),
+    changePassword: (payload) => performAuthenticatedAction('/api/v1/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }),
+    deleteAccount: async (payload) => {
+      await performAuthenticatedAction('/api/v1/auth/me', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      updateSession(null);
+    },
     authFetch,
   }), [authReady, session]);
 

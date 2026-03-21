@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useState } from 'react';
 
 import { Card, FormField, Loader } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -16,7 +16,7 @@ const RenderCards = ({
       <Card
         key={post._id}
         {...post}
-        showReactionSummary={true}
+        showReactionSummary={!isAuthenticated}
         showReactionControls={isAuthenticated}
         reactionDisabled={reactingPostId === post._id}
         onReact={(reaction) => onReact(post, reaction)}
@@ -39,9 +39,9 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [allPosts, setAllPosts] = useState([]);
   const [searchText, setSearchText] = useState('');
-  const [searchedResults, setSearchedResults] = useState([]);
   const [error, setError] = useState('');
   const [reactingPostId, setReactingPostId] = useState('');
+  const deferredSearchText = useDeferredValue(searchText);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -69,30 +69,17 @@ const Home = () => {
     fetchPosts();
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const normalizedSearch = searchText.trim().toLowerCase();
-
-      if (!normalizedSearch) {
-        setSearchedResults([]);
-        return;
-      }
-
-      setSearchedResults(
-        allPosts.filter((post) =>
-          (post.ownerName || post.name).toLowerCase().includes(normalizedSearch) ||
-          post.prompt.toLowerCase().includes(normalizedSearch)
-        )
-      );
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [allPosts, searchText]);
-
   const handleSearchChange = (e) => {
     setSearchText(e.target.value);
   };
 
+  const normalizedSearch = deferredSearchText.trim().toLowerCase();
+  const visiblePosts = normalizedSearch
+    ? allPosts.filter((post) => {
+        const searchableContent = `${post.ownerName || post.name || ''} ${post.prompt || ''}`.toLowerCase();
+        return searchableContent.includes(normalizedSearch);
+      })
+    : allPosts;
   const handleReaction = async (post, nextReaction) => {
     if (!isAuthenticated) {
       return;
@@ -130,8 +117,7 @@ const Home = () => {
 
   const stats = [
     { label: 'Creations shared', value: allPosts.length },
-    { label: 'Search results', value: searchText ? searchedResults.length : allPosts.length },
-    { label: 'AI modes', value: 3 },
+    { label: 'Visible results', value: visiblePosts.length },
   ];
 
   return (
@@ -141,7 +127,7 @@ const Home = () => {
           <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
             Curated AI Gallery
           </div>
-          <h1 className='font-display gradient-text mt-5 max-w-3xl text-4xl leading-tight sm:text-5xl lg:text-6xl'>
+          <h1 className='font-display gradient-text mt-5 max-w-3xl pb-1 text-4xl leading-[1.08] sm:text-5xl lg:text-6xl'>
             Popular creations with a warmer, editorial feel.
           </h1>
           <p className='mt-5 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
@@ -160,15 +146,9 @@ const Home = () => {
 
         <div className='glass-panel rounded-[34px] px-6 py-8 sm:px-7'>
           <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a6c5d]'>Find a mood</p>
-          <h2 className='font-display mt-4 text-3xl text-[#1b2235]'>Search by creator or prompt</h2>
+          <h2 className='font-display mt-4 pb-1 text-3xl leading-[1.08] text-[#1b2235]'>Search by creator or prompt</h2>
           <p className='mt-3 text-sm leading-7 text-[#616b79]'>
             Narrow the board instantly and uncover the exact image style, aesthetic, or artist mood you want to revisit.
-          </p>
-
-          <p className='mt-3 text-sm leading-7 text-[#616b79]'>
-            {isAuthenticated
-              ? 'You can like or dislike any public artwork. Clicking the same reaction again removes it.'
-              : 'Public artwork is visible to everyone. Sign in to like or dislike community posts.'}
           </p>
 
           <div className='mt-6'>
@@ -200,7 +180,7 @@ const Home = () => {
             <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
               <div>
                 <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-[#7a6c5d]'>Gallery Wall</p>
-                <h2 className='font-display mt-2 text-3xl text-[#1b2235]'>
+                <h2 className='font-display mt-2 pb-1 text-3xl leading-[1.08] text-[#1b2235]'>
                   {searchText ? 'Filtered results' : 'Latest shared frames'}
                 </h2>
               </div>
@@ -215,7 +195,7 @@ const Home = () => {
             <div className='grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'>
               {searchText ? (
                 <RenderCards
-                  data={searchedResults}
+                  data={visiblePosts}
                   title='No search results found'
                   isAuthenticated={isAuthenticated}
                   reactingPostId={reactingPostId}
@@ -223,7 +203,7 @@ const Home = () => {
                 />
               ) : (
                 <RenderCards
-                  data={allPosts}
+                  data={visiblePosts}
                   title='No posts found'
                   isAuthenticated={isAuthenticated}
                   reactingPostId={reactingPostId}

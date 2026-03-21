@@ -59,6 +59,13 @@ const getOpenApiSpec = () => ({
                     user: { $ref: '#/components/schemas/User' },
                 },
             },
+            MessageResponse: {
+                type: 'object',
+                properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string' },
+                },
+            },
             Post: {
                 type: 'object',
                 properties: {
@@ -67,6 +74,7 @@ const getOpenApiSpec = () => ({
                     ownerName: { type: 'string' },
                     prompt: { type: 'string' },
                     photo: { type: 'string' },
+                    photoPublicId: { type: 'string', nullable: true },
                     isCommunity: { type: 'boolean' },
                     likeCount: { type: 'integer', example: 3 },
                     dislikeCount: { type: 'integer', example: 1 },
@@ -112,6 +120,21 @@ const getOpenApiSpec = () => ({
                 required: ['email', 'password'],
                 properties: {
                     email: { type: 'string', format: 'email', example: 'soumyadev@example.com' },
+                    password: { type: 'string', example: 'super-secret-password' },
+                },
+            },
+            ChangePasswordRequest: {
+                type: 'object',
+                required: ['currentPassword', 'newPassword'],
+                properties: {
+                    currentPassword: { type: 'string', example: 'old-password' },
+                    newPassword: { type: 'string', example: 'new-password' },
+                },
+            },
+            DeleteAccountRequest: {
+                type: 'object',
+                required: ['password'],
+                properties: {
                     password: { type: 'string', example: 'super-secret-password' },
                 },
             },
@@ -279,6 +302,58 @@ const getOpenApiSpec = () => ({
                     401: { description: 'Missing or invalid token' },
                 },
             },
+            delete: {
+                tags: ['Auth'],
+                summary: 'Delete the current user account and all linked creations',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/DeleteAccountRequest' },
+                        },
+                    },
+                },
+                responses: {
+                    200: {
+                        description: 'Account deleted',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/MessageResponse' },
+                            },
+                        },
+                    },
+                    400: { description: 'Password required' },
+                    401: { description: 'Missing, invalid, or incorrect password' },
+                },
+            },
+        },
+        '/api/v1/auth/change-password': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Update the current user password',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/ChangePasswordRequest' },
+                        },
+                    },
+                },
+                responses: {
+                    200: {
+                        description: 'Password updated',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/MessageResponse' },
+                            },
+                        },
+                    },
+                    400: { description: 'Validation error' },
+                    401: { description: 'Missing, invalid, or incorrect credentials' },
+                },
+            },
         },
         '/api/v1/post': {
             get: {
@@ -372,6 +447,33 @@ const getOpenApiSpec = () => ({
                         },
                     },
                     400: { description: 'Validation error' },
+                    401: { description: 'Missing or invalid token' },
+                    404: { description: 'Post not found' },
+                },
+            },
+        },
+        '/api/v1/post/{postId}': {
+            delete: {
+                tags: ['Posts'],
+                summary: 'Delete one of the current user posts',
+                security: [{ bearerAuth: [] }],
+                parameters: [
+                    {
+                        name: 'postId',
+                        in: 'path',
+                        required: true,
+                        schema: { type: 'string' },
+                    },
+                ],
+                responses: {
+                    200: {
+                        description: 'Post deleted',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/MessageResponse' },
+                            },
+                        },
+                    },
                     401: { description: 'Missing or invalid token' },
                     404: { description: 'Post not found' },
                 },

@@ -10,6 +10,7 @@ const PostSchema = new mongoose.Schema({
     ownerName: { type: String, required: true },
     prompt: { type: String, required: true },
     photo: { type: String, required: true },
+    photoPublicId: { type: String, default: null },
     isCommunity: { type: Boolean, default: false },
     reactions: { type: [ReactionSchema], default: [] },
 }, {

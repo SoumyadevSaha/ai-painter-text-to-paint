@@ -54,6 +54,8 @@ GET /api/v1/health
 POST /api/v1/auth/register
 POST /api/v1/auth/login
 GET /api/v1/auth/me
+POST /api/v1/auth/change-password
+DELETE /api/v1/auth/me
 ```
 
 ### Posts
@@ -63,6 +65,7 @@ GET /api/v1/post
 GET /api/v1/post/mine
 POST /api/v1/post
 PATCH /api/v1/post/:postId/community
+DELETE /api/v1/post/:postId
 POST /api/v1/post/:postId/reaction
 ```
 
@@ -84,8 +87,11 @@ After setup, this is the fastest way to confirm the full app works:
 5. Open `My Creations`
 6. Publish the post to the community
 7. Open the home page and confirm the post appears there
-8. If Cloudinary is enabled, confirm the image appears in Cloudinary Media Library
-9. If MongoDB is enabled, restart the backend and confirm the data persists
+8. Like or dislike a community post while signed in, then click the same icon again to clear it
+9. Open `Profile`, change the password, and confirm the old password no longer works
+10. Delete one of your studio posts and confirm it disappears from `My Creations`
+11. If Cloudinary is enabled, confirm the image appears in Cloudinary Media Library and disappears after deletion
+12. If MongoDB is enabled, restart the backend and confirm the data persists
 
 ## GitHub Actions CI
 
