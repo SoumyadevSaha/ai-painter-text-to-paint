@@ -47,7 +47,8 @@ const Card = ({
   ownerName,
   prompt,
   photo,
-  badgeText = 'Community Pick',
+  badges,
+  badgeText = 'Public',
   likeCount = 0,
   dislikeCount = 0,
   viewerReaction = null,
@@ -57,16 +58,26 @@ const Card = ({
   onReact,
   actionLabel,
   actionDisabled = false,
+  actionBusyLabel = 'Updating...',
   onAction,
   secondaryActionLabel,
   secondaryActionDisabled = false,
+  secondaryActionBusyLabel = 'Updating...',
   secondaryActionTone = 'neutral',
   onSecondaryAction,
+  tertiaryActionLabel,
+  tertiaryActionDisabled = false,
+  tertiaryActionBusyLabel = 'Updating...',
+  tertiaryActionTone = 'neutral',
+  onTertiaryAction,
 }) => {
   const displayName = ownerName || name || 'Artist';
   const [animatingReaction, setAnimatingReaction] = useState('');
   const hasPrimaryAction = Boolean(onAction);
   const hasSecondaryAction = Boolean(onSecondaryAction);
+  const hasTertiaryAction = Boolean(onTertiaryAction);
+  const badgeItems = (Array.isArray(badges) && badges.length > 0 ? badges : [badgeText]).filter(Boolean);
+  const actionCount = [hasPrimaryAction, hasSecondaryAction, hasTertiaryAction].filter(Boolean).length;
 
   useEffect(() => {
     if (!animatingReaction) {
@@ -97,8 +108,15 @@ const Card = ({
 
       <div className="card-overlay absolute inset-3 flex flex-col justify-between rounded-[22px] p-4 opacity-100 transition duration-300 sm:p-5 sm:opacity-0 sm:group-hover:opacity-100">
         <div className='space-y-3'>
-          <div className='inline-flex w-fit rounded-full bg-white/14 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm'>
-            {badgeText}
+          <div className='flex flex-wrap gap-2'>
+            {badgeItems.map((badge, index) => (
+              <span
+                key={`${badge}-${index}`}
+                className='inline-flex w-fit rounded-full bg-white/14 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm'
+              >
+                {badge}
+              </span>
+            ))}
           </div>
 
           <p className='card-prompt prompt-clamp text-sm leading-6'>
@@ -172,14 +190,14 @@ const Card = ({
               </button>
             </div>
 
-            <div className='studio-card-actions-right'>
+            <div className={`studio-card-actions-right studio-card-actions-count-${actionCount}`}>
               <button
                 type='button'
                 onClick={onAction}
                 disabled={actionDisabled}
                 className='studio-action-button studio-action-share'
               >
-                {actionDisabled ? 'Updating...' : actionLabel}
+                {actionDisabled ? actionBusyLabel : actionLabel}
               </button>
 
               {hasSecondaryAction && (
@@ -193,7 +211,22 @@ const Card = ({
                       : 'studio-action-neutral'
                   }`}
                 >
-                  {secondaryActionDisabled ? 'Deleting...' : secondaryActionLabel}
+                  {secondaryActionDisabled ? secondaryActionBusyLabel : secondaryActionLabel}
+                </button>
+              )}
+
+              {hasTertiaryAction && (
+                <button
+                  type='button'
+                  onClick={onTertiaryAction}
+                  disabled={tertiaryActionDisabled}
+                  className={`studio-action-button ${
+                    tertiaryActionTone === 'danger'
+                      ? 'studio-action-delete'
+                      : 'studio-action-neutral'
+                  }`}
+                >
+                  {tertiaryActionDisabled ? tertiaryActionBusyLabel : tertiaryActionLabel}
                 </button>
               )}
             </div>

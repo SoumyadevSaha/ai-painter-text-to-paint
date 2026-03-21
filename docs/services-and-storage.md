@@ -1,6 +1,6 @@
 # VinciForge Services and Storage
 
-This guide covers MongoDB, Cloudinary, OpenAI, and the app's fallback behavior.
+This guide covers MongoDB, Cloudinary, Puter-first image generation, and the app's fallback behavior.
 
 ## MongoDB Setup
 
@@ -124,8 +124,10 @@ MAX_SOURCE_IMAGE_BYTES=5242880
 ### Why the Current Defaults Are Safe for a Free Cloudinary Account
 
 - `MAX_SOURCE_IMAGE_BYTES=5242880` keeps uploads below 5 MB
+- uploads are limited to images and GIFs only
+- the backend uploads assets to Cloudinary as `resource_type=image`
 - `CLOUDINARY_MIRROR_REMOTE_IMAGES=false` avoids re-uploading remote provider URLs unnecessarily
-- Cloudinary is only used when a user saves a post
+- Cloudinary is only used when a user saves or shares a post
 
 ### Local Cloudinary Verification
 
@@ -133,8 +135,8 @@ MAX_SOURCE_IMAGE_BYTES=5242880
 2. Start the backend with `npm run dev`
 3. Start the frontend with `npm run dev`
 4. Register or log in
-5. Generate an image
-6. Save it
+5. Upload an image or generate one with Puter
+6. Save it or share it
 7. Open the Home page or My Creations page and confirm the image URL is now a Cloudinary delivery URL
 
 ### Where Uploaded Images Appear
@@ -164,18 +166,26 @@ CLOUDINARY_UPLOAD_FOLDER=ai-painter
 
 If an API secret was ever exposed publicly, rotate it in Cloudinary before using the app in production.
 
-## OpenAI and Provider Fallbacks
+## Image Inputs and Generation Fallbacks
 
-OpenAI is optional.
+The current studio flow is upload-first:
 
-To enable backend image generation:
+- users can upload their own image or GIF
+- users can optionally generate an image with Puter in the browser
+- the server keeps a local mock image route as the last fallback
 
-```env
-OPENAI_API_KEY=your_openai_key
-OPENAI_IMAGE_MODEL=gpt-image-1.5
-```
+### Upload Rules
 
-If `OPENAI_API_KEY` is missing or fails:
+- only image files and GIFs are accepted
+- videos, audio, documents, archives, and executables are rejected
+- the default maximum image payload is `5242880` bytes, which is 5 MB
+- the size guard applies before Cloudinary upload so free-tier usage stays predictable
 
-- the frontend can fall back to Puter when `VITE_ENABLE_PUTER_FALLBACK=true`
-- the app can still fall back to the local mock generator
+### Generation Order
+
+If `VITE_ENABLE_PUTER_FALLBACK=true`, the create page tries image generation in this order:
+
+1. Puter in the browser
+2. the server mock image route at `POST /api/v1/dalle`
+
+This means the backend does not require an external image API key to stay functional.

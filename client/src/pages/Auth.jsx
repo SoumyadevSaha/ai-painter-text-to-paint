@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { FormField } from '../components';
@@ -116,7 +116,7 @@ const Auth = () => {
             labelName='Email'
             type='email'
             name='email'
-            placeholder='you@example.com'
+            placeholder='youremail@gmail.com'
             value={form.email}
             handleChange={handleChange}
           />
@@ -125,7 +125,7 @@ const Auth = () => {
             labelName='Password'
             type='password'
             name='password'
-            placeholder='Create a secure password'
+            placeholder='Enter your password'
             value={form.password}
             handleChange={handleChange}
           />

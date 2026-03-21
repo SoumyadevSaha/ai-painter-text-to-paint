@@ -30,6 +30,7 @@ describe('MyCreations page', () => {
               prompt: 'A glowing palace in the monsoon',
               photo: 'data:image/svg+xml;base64,PHN2Zy8+',
               isCommunity: false,
+              sourceType: 'generated',
             },
           ],
         }),
@@ -43,6 +44,7 @@ describe('MyCreations page', () => {
             prompt: 'A glowing palace in the monsoon',
             photo: 'data:image/svg+xml;base64,PHN2Zy8+',
             isCommunity: true,
+            sourceType: 'generated',
           },
         }),
       });
@@ -73,6 +75,7 @@ describe('MyCreations page', () => {
 
     expect(await screen.findByText('Unshare')).toBeInTheDocument();
     expect(screen.getByText('Public')).toBeInTheDocument();
+    expect(screen.getByText('AI Generated')).toBeInTheDocument();
   });
 
   it('lets the creator delete one of their studio posts', async () => {
@@ -88,6 +91,7 @@ describe('MyCreations page', () => {
               prompt: 'A removable artwork',
               photo: 'data:image/svg+xml;base64,PHN2Zy8+',
               isCommunity: true,
+              sourceType: 'generated',
             },
           ],
         }),
@@ -121,5 +125,37 @@ describe('MyCreations page', () => {
     });
 
     expect(await screen.findByText('No creations yet')).toBeInTheDocument();
+  });
+
+  it('keeps the studio cards lightweight without edit controls', async () => {
+    const authFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            _id: 'post-3',
+            ownerName: 'Soumyadev',
+            prompt: 'Original studio caption',
+            photo: 'data:image/svg+xml;base64,PHN2Zy8+',
+            isCommunity: false,
+            sourceType: 'upload',
+          },
+        ],
+      }),
+    });
+
+    mockUseAuth.mockReturnValue({
+      authFetch,
+      user: { _id: 'user-1', name: 'Soumyadev' },
+    });
+
+    render(
+      <MemoryRouter>
+        <MyCreations />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Share')).toBeInTheDocument();
+    expect(screen.queryByText('Edit Text')).not.toBeInTheDocument();
   });
 });

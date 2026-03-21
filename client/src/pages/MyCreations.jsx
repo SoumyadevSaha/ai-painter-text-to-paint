@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Card, Loader } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -91,13 +91,13 @@ const MyCreations = () => {
     <section className='space-y-8 pb-6'>
       <div className='glass-panel-strong rounded-[34px] px-6 py-8 sm:px-8'>
         <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
-          Your Studio
+          Your Private Gallery
         </div>
         <h1 className='font-display gradient-text mt-5 pb-1 text-4xl leading-[1.08] sm:text-5xl'>
           {user?.name ? `${user.name}'s creations` : 'Your creations'}
         </h1>
         <p className='mt-4 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
-          Every piece you generate belongs here first. Publish selected posts to the community when they are ready for the gallery wall.
+          Every upload and every generated piece can live here first. Publish selected posts to the community when they are ready for the gallery wall.
         </p>
       </div>
 
@@ -115,7 +115,7 @@ const MyCreations = () => {
         <div className='glass-panel-strong rounded-[28px] px-6 py-10 text-center'>
           <p className='font-display text-2xl text-[#1b2235]'>No creations yet</p>
           <p className='mx-auto mt-3 max-w-md text-sm leading-6 text-[#6c7684]'>
-            Generate your first artwork from the Create page, keep it private, or share it with the community when you like.
+            Upload your first image or generate one from the Create page, keep it private, or share it with the community when you like.
           </p>
         </div>
       ) : (
@@ -124,14 +124,19 @@ const MyCreations = () => {
             <Card
               key={post._id}
               {...post}
-              badgeText={post.isCommunity ? 'Public' : 'Private'}
+              badges={[
+                post.isCommunity ? 'Public' : 'Private',
+                post.sourceType === 'upload' ? 'User Uploaded' : 'AI Generated',
+              ]}
               actionLabel={post.isCommunity ? 'Unshare' : 'Share'}
               actionDisabled={updatingPostId === post._id}
+              actionBusyLabel='Updating...'
               onAction={() => toggleCommunityState(post)}
-              secondaryActionLabel='Delete'
-              secondaryActionDisabled={deletingPostId === post._id}
-              secondaryActionTone='danger'
-              onSecondaryAction={() => deletePost(post._id)}
+              tertiaryActionLabel='Delete'
+              tertiaryActionDisabled={deletingPostId === post._id}
+              tertiaryActionBusyLabel='Deleting...'
+              tertiaryActionTone='danger'
+              onTertiaryAction={() => deletePost(post._id)}
             />
           ))}
         </div>
