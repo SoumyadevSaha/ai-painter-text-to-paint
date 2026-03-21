@@ -1,5 +1,6 @@
 import { surpriseMePrompts } from "../constants";
 import FileSaver from "file-saver";
+import { getImageExtensionFromSource } from "./imageFiles";
 
 const getRandomPrompt = (prompt) => {
     const randomIdx = Math.floor(Math.random() * surpriseMePrompts.length);
@@ -12,7 +13,8 @@ const getRandomPrompt = (prompt) => {
 }
 
 const downloadImage = async(_id, photo) => {
-    FileSaver.saveAs(photo, `download-${_id}-vinciforge-soumya.jpg`);
+    const extension = getImageExtensionFromSource(photo);
+    FileSaver.saveAs(photo, `download-${_id}-vinciforge-soumya.${extension}`);
 }
 
 export { getRandomPrompt, downloadImage };

@@ -1,36 +1,69 @@
-import React, { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { preview } from '../assets';
-import { getRandomPrompt } from '../utils';
-import { generateImageWithPuter, isPuterFallbackEnabled } from '../utils/puter';
 import { FormField, Loader } from '../components';
-import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
+import { useAuth } from '../context/AuthContext';
+import { getRandomPrompt } from '../utils';
+import {
+  MAX_IMAGE_UPLOAD_BYTES,
+  formatBytes,
+  readFileAsDataUrl,
+  validateImageUploadFile,
+} from '../utils/imageFiles';
+import { generateImageWithPuter, isPuterFallbackEnabled } from '../utils/puter';
+
+const UploadIcon = () => (
+  <svg
+    viewBox='0 0 24 24'
+    aria-hidden='true'
+    className='h-3.5 w-3.5'
+    fill='none'
+    stroke='currentColor'
+    strokeWidth='1.9'
+    strokeLinecap='round'
+    strokeLinejoin='round'
+  >
+    <path d='M12 16V4' />
+    <path d='m7 9 5-5 5 5' />
+    <path d='M5 20h14' />
+  </svg>
+);
 
 const CreatePainting = () => {
   const navigate = useNavigate();
   const { authFetch, user } = useAuth();
+  const uploadInputRef = useRef(null);
   const [form, setForm] = useState({
     prompt: '',
-    photo: '',
+    uploadedPhoto: '',
+    generatedPhoto: '',
   });
-  const [saveToLibrary, setSaveToLibrary] = useState(true);
-  const [savedPostId, setSavedPostId] = useState('');
+  const [activeSource, setActiveSource] = useState('');
+  const [uploadedAsset, setUploadedAsset] = useState(null);
   const [generatingImg, setGeneratingImg] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submittingAction, setSubmittingAction] = useState('');
   const [error, setError] = useState('');
-  const [providerMessage, setProviderMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const selectedPrompt = form.prompt.trim();
+  const selectedPhoto = activeSource === 'upload'
+    ? form.uploadedPhoto.trim()
+    : activeSource === 'generated'
+      ? form.generatedPhoto.trim()
+      : '';
+  const selectedSourceLabel = activeSource === 'upload' ? 'User Uploaded' : 'AI Generated';
 
-  const createPost = async ({ photo, isCommunity }) => {
+  const createPost = async ({ photo, prompt, isCommunity }) => {
     const response = await authFetch('/api/v1/post', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt: form.prompt.trim(),
+        prompt,
         photo,
+        sourceType: activeSource === 'upload' ? 'upload' : 'generated',
         isCommunity,
       }),
     });
@@ -44,64 +77,41 @@ const CreatePainting = () => {
     return data.data;
   };
 
-  const publishSavedPost = async (postId) => {
-    const response = await authFetch(`/api/v1/post/${postId}/community`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ isCommunity: true }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data?.error || data?.message || 'Failed to share post');
-    }
-
-    return data.data;
-  };
-
-  const finalizeGeneratedImage = async (photo, message) => {
-    setForm((currentForm) => ({ ...currentForm, photo }));
-    setSavedPostId('');
-
-    if (!saveToLibrary) {
-      setProviderMessage(message);
-      return;
-    }
-
-    try {
-      const savedPost = await createPost({ photo, isCommunity: false });
-      setSavedPostId(savedPost._id);
-      setProviderMessage(`${message} Saved to your private library.`);
-    } catch (saveError) {
-      setProviderMessage(message);
-      setError(`Image generated, but auto-save failed: ${saveError.message}`);
-    }
-  };
-
   const tryPuterFallback = async () => {
     if (!isPuterFallbackEnabled()) {
-      throw new Error('No AI provider is currently available. Add OPENAI_API_KEY or enable Puter fallback.');
+      throw new Error('AI image generation is currently unavailable.');
     }
 
     return generateImageWithPuter(form.prompt.trim());
   };
 
-  const generateImage = async () => {
-    if (form.prompt.trim()) {
-      setError('');
-      setProviderMessage('');
+  const applyGeneratedImage = (photo) => {
+    setForm((currentForm) => ({ ...currentForm, generatedPhoto: photo }));
+    setActiveSource('generated');
+    setStatusMessage('AI image ready.');
+  };
 
+  const generateImage = async () => {
+    if (!selectedPrompt) {
+      setError('Please enter a prompt or description first');
+      return;
+    }
+
+    setError('');
+    setStatusMessage('');
+
+    try {
+      setGeneratingImg(true);
       try {
-        setGeneratingImg(true);
+        const puterResult = await tryPuterFallback();
+        applyGeneratedImage(puterResult.photo);
+      } catch {
         const response = await fetch(`${API_URL}/api/v1/dalle`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ prompt: form.prompt.trim() }),
+          body: JSON.stringify({ prompt: selectedPrompt }),
         });
 
         const data = await response.json();
@@ -110,83 +120,98 @@ const CreatePainting = () => {
           throw new Error(data?.error || data?.message || 'Failed to generate image');
         }
 
-        let generatedPhoto = data.photo;
-        let nextMessage = 'AI provider unavailable, using local preview fallback.';
-
-        if (data.provider === 'mock' && isPuterFallbackEnabled()) {
-          try {
-            const puterResult = await tryPuterFallback();
-            generatedPhoto = puterResult.photo;
-            nextMessage = 'Image generated with Puter browser fallback.';
-            await finalizeGeneratedImage(generatedPhoto, nextMessage);
-            return;
-          } catch (puterError) {
-            nextMessage = 'AI provider unavailable, using local preview fallback.';
-          }
-        } else if (data.provider === 'openai') {
-          nextMessage = 'Image generated with OpenAI.';
-        }
-
-        await finalizeGeneratedImage(generatedPhoto, nextMessage);
-      } catch (error) {
-        try {
-          const puterResult = await tryPuterFallback();
-          await finalizeGeneratedImage(puterResult.photo, 'Image generated with Puter browser fallback.');
-        } catch (fallbackError) {
-          setError(fallbackError.message || error.message);
-        }
-      } finally {
-        setGeneratingImg(false);
+        applyGeneratedImage(data.photo);
       }
-    } else {
-      setError('Please enter a prompt');
+    } catch (generationError) {
+      setError(generationError.message || 'Failed to generate image');
+    } finally {
+      setGeneratingImg(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const ensureSelectedPostIsReady = () => {
+    if (!selectedPrompt) {
+      throw new Error('Please enter a prompt or description first');
+    }
 
-    if (form.prompt.trim() && form.photo.trim()) {
+    if (!selectedPhoto) {
+      throw new Error('Please generate or upload an image first');
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    try {
+      ensureSelectedPostIsReady();
       setError('');
-      setLoading(true);
+      setStatusMessage('');
+      setSubmittingAction('share');
 
-      try {
-        if (savedPostId) {
-          await publishSavedPost(savedPostId);
-        } else {
-          const createdPost = await createPost({
-            photo: form.photo,
-            isCommunity: true,
-          });
-          setSavedPostId(createdPost._id);
-        }
+      await createPost({
+        prompt: selectedPrompt,
+        photo: selectedPhoto,
+        isCommunity: true,
+      });
 
-        navigate('/');
-      } catch (error) {
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setError('Please add a prompt and generate an image first');
+      navigate('/');
+    } catch (submitError) {
+      setError(submitError.message);
+    } finally {
+      setSubmittingAction('');
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
-    if (name === 'prompt') {
-      setSavedPostId('');
-    }
+    setForm((currentForm) => ({ ...currentForm, [name]: value }));
+    setError('');
   };
 
   const handleSurpriseMe = () => {
     const randomPrompt = getRandomPrompt(form.prompt);
-    setForm({ ...form, prompt: randomPrompt });
+    setForm((currentForm) => ({ ...currentForm, prompt: randomPrompt }));
+    setError('');
+  };
+
+  const handleUploadChange = async (event) => {
+    const nextFile = event.target.files?.[0];
+
+    if (!nextFile) {
+      return;
+    }
+
+    setError('');
+    setStatusMessage('');
+
+    const validationMessage = validateImageUploadFile(nextFile);
+
+    if (validationMessage) {
+      event.target.value = '';
+      setError(validationMessage);
+      return;
+    }
+
+    try {
+      const uploadedPhoto = await readFileAsDataUrl(nextFile);
+      setUploadedAsset({
+        name: nextFile.name,
+        size: nextFile.size,
+      });
+      setForm((currentForm) => ({ ...currentForm, uploadedPhoto }));
+      setActiveSource('upload');
+      setStatusMessage('Upload ready.');
+    } catch (uploadError) {
+      setError(uploadError.message);
+    }
+  };
+
+  const handleUploadButtonClick = () => {
+    uploadInputRef.current?.click();
   };
 
   return (
-    <section className='grid gap-6 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]'>
+    <section className='grid gap-6 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]'>
       <form className='glass-panel-strong order-2 rounded-[34px] px-6 py-8 sm:px-8 lg:order-1' onSubmit={handleSubmit}>
         <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
           Studio Mode
@@ -195,94 +220,125 @@ const CreatePainting = () => {
           Create something bold, warm, and worth sharing.
         </h1>
         <p className='mt-4 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
-          Build your artwork prompt, generate a frame, and decide whether it should stay in your private library or go straight to the community.
+          Upload your own image or build a fresh one with AI, then share the version that feels ready for the gallery.
         </p>
         <p className='mt-3 text-sm leading-7 text-[#5f6776]'>
-          Signed in as <span className='font-semibold text-[#1b2235]'>{user?.name}</span>. Private saves can happen automatically as soon as the image is generated.
+          Signed in as <span className='font-semibold text-[#1b2235]'>{user?.name}</span>. Images and GIFs only, up to {formatBytes(MAX_IMAGE_UPLOAD_BYTES)}.
         </p>
 
-        <div className='mt-8 space-y-4'>
+        <div className='mt-6 space-y-4'>
           {error && (
             <p className="rounded-[22px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
               {error}
             </p>
           )}
 
-          {providerMessage && (
+          {statusMessage && (
             <p className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
-              {providerMessage}
+              {statusMessage}
             </p>
           )}
         </div>
 
-        <div className="mt-8 flex flex-col gap-6">
+        <div className="mt-8 flex flex-col gap-5">
           <FormField
-            labelName="Prompt"
+            labelName="Prompt / Description"
             type="text"
             name="prompt"
-            placeholder="A cinematic botanical observatory floating above monsoon clouds..."
+            placeholder="A hand-shot street mural glowing after the rain..."
             value={form.prompt}
             handleChange={handleChange}
             isSurpriseMe={true}
             handleSurpriseMe={handleSurpriseMe}
+            multiline={true}
+            rows={4}
           />
 
-          <label className='field-surface flex items-center justify-between gap-4 rounded-[22px] px-4 py-4'>
-            <div>
-              <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#586578]'>Save to Private Library</p>
-              <p className='mt-2 text-sm leading-6 text-[#5d6675]'>
-                Automatically save each generated artwork to My Creations. Uncheck to preview without saving.
-              </p>
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type='button'
+              onClick={handleUploadButtonClick}
+              disabled={submittingAction !== '' || generatingImg}
+              className='btn-secondary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              <UploadIcon />
+              Upload from Device
+            </button>
 
             <input
-              type='checkbox'
-              checked={saveToLibrary}
-              onChange={(event) => setSaveToLibrary(event.target.checked)}
-              className='h-5 w-5 accent-[#e66a4f]'
+              ref={uploadInputRef}
+              type='file'
+              accept='image/*'
+              aria-label='Upload from device'
+              onChange={handleUploadChange}
+              className='sr-only'
+              disabled={submittingAction !== '' || generatingImg}
+              tabIndex={-1}
             />
-          </label>
 
-          <div className="flex flex-col gap-4 pt-2 sm:flex-row">
             <button
               type='button'
               onClick={generateImage}
-              className='btn-secondary rounded-full px-6 py-3 text-sm font-semibold'
+              disabled={generatingImg || submittingAction !== ''}
+              className='btn-ghost rounded-full px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60'
             >
-              {generatingImg ? 'Generating...' : 'Generate Image'}
+              {generatingImg ? 'Generating...' : 'Generate with AI'}
             </button>
+
             <button
               type='submit'
-              className='btn-primary rounded-full px-6 py-3 text-sm font-semibold'
+              disabled={submittingAction !== '' || generatingImg}
+              className='btn-primary rounded-full px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60'
             >
-              {loading ? 'Sharing...' : 'Share to Community'}
+              {submittingAction === 'share' ? 'Sharing...' : 'Share to Community'}
             </button>
+          </div>
+
+          <div className='flex flex-wrap gap-2'>
+            {activeSource && (
+              <span className='chip rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]'>
+                {selectedSourceLabel}
+              </span>
+            )}
+
+            {activeSource === 'upload' && uploadedAsset && (
+              <span className='chip rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]'>
+                {uploadedAsset.name} • {formatBytes(uploadedAsset.size)}
+              </span>
+            )}
           </div>
         </div>
       </form>
 
       <aside className='order-1 lg:order-2'>
         <div className='glass-panel sticky top-6 rounded-[34px] px-6 py-8'>
-          <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a6c5d]'>Live Preview</p>
-          <h2 className='font-display mt-4 pb-1 text-3xl leading-[1.08] text-[#1b2235]'>Your composition board</h2>
+          <div className='flex flex-wrap items-center gap-2'>
+            <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a6c5d]'>Live Preview</p>
+            {activeSource && (
+              <span className='chip rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]'>
+                {selectedSourceLabel}
+              </span>
+            )}
+          </div>
+
+          <h2 className='font-display mt-4 pb-1 text-3xl leading-[1.08] text-[#1b2235]'>
+            Your composition board
+          </h2>
           <p className='mt-3 text-sm leading-7 text-[#616b79]'>
-            Generate first, review the framing, then publish only the image you want attached to your name.
+            Upload your own image or generate one with AI, review the framing, then publish only the version you want attached to your name.
           </p>
 
-          <div className="preview-stage relative mt-8 flex min-h-[360px] items-center justify-center overflow-hidden rounded-[28px] p-5">
-            {form.photo ? (
+          <div className="preview-stage relative mt-6 flex min-h-[360px] items-center justify-center overflow-hidden rounded-[28px] p-5">
+            {selectedPhoto ? (
               <>
                 <img 
-                  src={form.photo}
-                  alt={form.prompt}
+                  src={selectedPhoto}
+                  alt={selectedPrompt || selectedSourceLabel || 'Preview'}
                   className='relative z-[1] h-full w-full rounded-[22px] object-contain'
                 />
                 <div className='preview-caption absolute inset-x-5 bottom-5 z-[2] rounded-[22px] px-4 py-4'>
-                  <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-white/70'>
-                    Created by {user?.name || 'You'}
-                  </p>
                   <p className='mt-2 text-sm leading-6 text-white'>
-                    {form.prompt || 'Your prompt will appear here once you write one.'}
+                    {selectedPrompt || 'Your prompt or description will appear here.'}
                   </p>
                 </div>
               </>
@@ -294,7 +350,7 @@ const CreatePainting = () => {
                   className='h-40 w-40 object-contain opacity-90'
                 />
                 <p className='mt-5 max-w-xs text-sm leading-6 text-[#5f6776]'>
-                  Your generated frame will appear here with the provider status shown above the form.
+                  Your uploaded image or generated frame will appear here once it is ready.
                 </p>
               </div>
             )}

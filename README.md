@@ -1,10 +1,10 @@
 # VinciForge
 
-VinciForge is a full-stack MERN app for generating AI artwork, saving it to a personal studio, and publishing selected pieces to a community gallery.
+VinciForge is a full-stack MERN app for uploading your own artwork, generating new images with AI, building a personal gallery, and sharing selected pieces with the world through a public community feed.
 
 It is designed to stay usable even when some external services are missing:
 
-- OpenAI can be absent and the app still generates images through Puter or the local mock generator
+- external image APIs can be absent and the app still generates images through Puter or the local mock generator
 - MongoDB can be absent and the app still stores data in local JSON files
 - Cloudinary can be absent and the app still saves posts with the original image payload
 
@@ -13,11 +13,13 @@ It is designed to stay usable even when some external services are missing:
 - React + Vite frontend
 - Express backend with REST APIs
 - JWT authentication
-- Private personal studio for each user
-- Community gallery with publish/unpublish control
+- Upload-first studio for personal images and GIFs
+- AI image generation with browser-first fallback support
+- Personal gallery for everything you create
+- Public community gallery with share/unshare control
 - MongoDB support with local JSON fallback
 - Cloudinary support with free-tier-friendly upload guards
-- OpenAI support with Puter and mock-image fallback
+- Image uploads capped for a Cloudinary free account workflow
 - GitHub Actions CI for server tests, client tests, and client builds
 
 ## Tech Stack
@@ -27,7 +29,7 @@ It is designed to stay usable even when some external services are missing:
 - Database: MongoDB Atlas or local JSON fallback
 - Auth: JWT + password hashing
 - Media hosting: Cloudinary
-- Image generation: OpenAI, Puter.js, local mock generator
+- Image generation: Puter.js, local mock generator
 
 ## Project Structure
 
@@ -42,15 +44,24 @@ docs/     Setup, testing, service, and deployment guides
 Each user can:
 
 - register and log in
-- generate images
-- save creations to a private studio
-- publish selected creations to the community gallery later
+- upload images from their device
+- generate fresh artwork with AI
+- keep all of their creations in a personal gallery
+- share or unshare pieces from the public gallery whenever they want
+- delete artwork from their own gallery
 
 Image generation currently follows this fallback order:
 
-1. OpenAI on the backend
-2. Puter.js in the browser
-3. Local mock SVG preview
+1. Puter.js in the browser
+2. Local mock SVG preview from the backend
+
+## Product Experience
+
+VinciForge is designed around three simple ideas:
+
+- bring your own image and publish it with your own prompt or description
+- create a new frame with AI when you want a fresh concept
+- manage everything you make from your own gallery, then decide what stays public
 
 ## Quick Start
 

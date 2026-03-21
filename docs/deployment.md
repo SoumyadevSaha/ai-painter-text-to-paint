@@ -60,8 +60,6 @@ HOST=0.0.0.0
 PORT=10000
 MONGODB_URL=your_atlas_connection_string
 JWT_SECRET=your_long_random_secret
-OPENAI_API_KEY=
-OPENAI_IMAGE_MODEL=gpt-image-1.5
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
@@ -92,5 +90,7 @@ If you specifically need a free backend, prefer Render. Heroku no longer offers 
 - Set a strong `JWT_SECRET` in production
 - Use MongoDB Atlas instead of local JSON storage
 - Use Cloudinary credentials that are not exposed publicly
+- Keep `MAX_SOURCE_IMAGE_BYTES` at a free-tier-friendly value such as `5242880`
+- The create page only accepts image uploads and GIFs, so do not wire document or video upload expectations into deployment
 - Rotate any secret that was previously shared
 - Set `VITE_API_URL` to your deployed backend URL before deploying the frontend

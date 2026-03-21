@@ -13,9 +13,13 @@ const RenderCards = ({
 }) => {
   if (data?.length > 0) {
     return data.map((post) => (
-      <Card
-        key={post._id}
-        {...post}
+        <Card
+          key={post._id}
+          {...post}
+          badges={[
+          'Public',
+          post.sourceType === 'upload' ? 'User Uploaded' : 'AI Generated',
+        ]}
         showReactionSummary={!isAuthenticated}
         showReactionControls={isAuthenticated}
         reactionDisabled={reactingPostId === post._id}
@@ -27,7 +31,7 @@ const RenderCards = ({
       <div className='glass-panel-strong rounded-[28px] px-6 py-10 text-center'>
         <p className='font-display text-2xl text-[#1b2235]'>{title}</p>
         <p className='mx-auto mt-3 max-w-md text-sm leading-6 text-[#6c7684]'>
-          Start crafting a fresh prompt and share something unexpected with the gallery.
+          Start with an upload or an AI prompt in the studio, then share something unexpected with the gallery.
         </p>
       </div>
     );
@@ -131,7 +135,7 @@ const Home = () => {
             Popular creations with a warmer, editorial feel.
           </h1>
           <p className='mt-5 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
-            Explore community-made scenes, dreamy concepts, and experimental prompts from a gallery that feels more like a design wall than a dashboard.
+            Explore community-made uploads, dreamy prompt experiments, and scene studies from a gallery that feels more like a design wall than a dashboard.
           </p>
 
           <div className='mt-8 grid gap-3 sm:grid-cols-3'>

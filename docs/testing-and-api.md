@@ -64,6 +64,7 @@ DELETE /api/v1/auth/me
 GET /api/v1/post
 GET /api/v1/post/mine
 POST /api/v1/post
+PATCH /api/v1/post/:postId
 PATCH /api/v1/post/:postId/community
 DELETE /api/v1/post/:postId
 POST /api/v1/post/:postId/reaction
@@ -76,22 +77,26 @@ GET /api/v1/dalle
 POST /api/v1/dalle
 ```
 
+`POST /api/v1/dalle` is the mock preview fallback route. The create page tries Puter in the browser first.
+
 ## Quick Verification Checklist
 
 After setup, this is the fastest way to confirm the full app works:
 
 1. Start backend and frontend
 2. Register a user
-3. Generate an image
-4. Save it as a private post
-5. Open `My Creations`
-6. Publish the post to the community
-7. Open the home page and confirm the post appears there
-8. Like or dislike a community post while signed in, then click the same icon again to clear it
-9. Open `Profile`, change the password, and confirm the old password no longer works
-10. Delete one of your studio posts and confirm it disappears from `My Creations`
-11. If Cloudinary is enabled, confirm the image appears in Cloudinary Media Library and disappears after deletion
-12. If MongoDB is enabled, restart the backend and confirm the data persists
+3. Open `Create`, upload one of your own images, add a prompt or description, and share it
+4. Confirm the new post appears on the Home page as a public community item
+5. Return to `Create`, use an AI prompt, and generate an image
+6. Share the generated image and confirm it also appears on the Home page
+7. Open `My Creations` and confirm both your uploaded and AI-generated works appear in your personal gallery
+8. Unshare one of the posts from `My Creations` and confirm its status changes from public to private
+9. Share that same post again and confirm it returns to the public gallery
+10. Like or dislike a community post while signed in, then click the same icon again to clear it
+11. Open `Profile`, change the password, and confirm the old password no longer works
+12. Delete one of your creations and confirm it disappears from `My Creations`
+13. If Cloudinary is enabled, confirm the image appears in Cloudinary Media Library and disappears after deletion
+14. If MongoDB is enabled, restart the backend and confirm the data persists
 
 ## GitHub Actions CI
 

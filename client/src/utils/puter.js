@@ -1,3 +1,5 @@
+import { normalizeGeneratedPhotoSource } from './imageFiles';
+
 const PUTER_SCRIPT_URL = 'https://js.puter.com/v2/';
 
 let puterLoaderPromise;
@@ -48,9 +50,11 @@ const generateImageWithPuter = async (prompt) => {
     model: import.meta.env.VITE_PUTER_MODEL || 'gpt-image-1.5',
   });
 
-  if (image?.src) {
+  const imageSource = typeof image === 'string' ? image : image?.src || image;
+
+  if (imageSource) {
     return {
-      photo: image.src,
+      photo: await normalizeGeneratedPhotoSource(imageSource),
       provider: 'puter',
     };
   }
