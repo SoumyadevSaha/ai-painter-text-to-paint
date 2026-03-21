@@ -11,6 +11,7 @@ const PostSchema = new mongoose.Schema({
     prompt: { type: String, required: true },
     photo: { type: String, required: true },
     photoPublicId: { type: String, default: null },
+    sourceType: { type: String, enum: ['upload', 'generated'], default: 'generated' },
     isCommunity: { type: Boolean, default: false },
     reactions: { type: [ReactionSchema], default: [] },
 }, {

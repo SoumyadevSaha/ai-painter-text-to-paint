@@ -46,7 +46,8 @@ app.get('/api/v1/health', (req, res) => {
             process.env.CLOUDINARY_API_KEY &&
             process.env.CLOUDINARY_API_SECRET
         ),
-        openAIConfigured: Boolean(process.env.OPENAI_API_KEY),
+        imageGenerationMode: 'puter-browser-first',
+        imageFallbackProvider: 'mock',
         jwtConfigured: Boolean(process.env.JWT_SECRET),
         storageMode: isMongoReady() ? 'mongodb' : 'local-json',
     });

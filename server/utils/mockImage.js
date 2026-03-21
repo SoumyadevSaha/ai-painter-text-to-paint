@@ -35,7 +35,7 @@ const createMockImageDataUrl = (prompt) => {
                     ${escapeXml(shortPrompt)}
                 </div>
             </foreignObject>
-            <text x="512" y="820" text-anchor="middle" fill="#ffffff" font-size="28" font-family="Arial, sans-serif" opacity="0.72">Set OPENAI_API_KEY to switch from mock mode to real image generation</text>
+            <text x="512" y="820" text-anchor="middle" fill="#ffffff" font-size="28" font-family="Arial, sans-serif" opacity="0.72">Puter unavailable, showing a local preview fallback</text>
         </svg>
     `.trim();
 

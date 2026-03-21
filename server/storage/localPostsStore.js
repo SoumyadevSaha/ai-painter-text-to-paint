@@ -74,6 +74,7 @@ const createLocalPost = async (post) => {
         _id: randomUUID(),
         ...post,
         photoPublicId: post.photoPublicId || null,
+        sourceType: post.sourceType === 'upload' ? 'upload' : 'generated',
         reactions: Array.isArray(post.reactions) ? post.reactions : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -96,6 +97,24 @@ const updateLocalPostCommunityState = async ({ postId, userId, isCommunity }) =>
     posts[postIndex] = {
         ...posts[postIndex],
         isCommunity,
+        updatedAt: new Date().toISOString(),
+    };
+
+    await writePosts(posts);
+    return posts[postIndex];
+};
+
+const updateLocalPostPrompt = async ({ postId, userId, prompt }) => {
+    const posts = await readPosts();
+    const postIndex = posts.findIndex((post) => post._id === postId && post.userId === userId);
+
+    if (postIndex === -1) {
+        return null;
+    }
+
+    posts[postIndex] = {
+        ...posts[postIndex],
+        prompt,
         updatedAt: new Date().toISOString(),
     };
 
@@ -178,5 +197,6 @@ export {
     getUserPosts,
     removeLocalReactionsByUser,
     updateLocalPostCommunityState,
+    updateLocalPostPrompt,
     updateLocalPostReaction,
 };
