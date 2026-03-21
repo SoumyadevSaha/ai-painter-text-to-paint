@@ -68,7 +68,8 @@ test('health endpoint reports local-json fallback mode', { concurrency: false },
         assert.equal(response.status, 200);
         assert.equal(payload.status, 'ok');
         assert.equal(payload.storageMode, 'local-json');
-        assert.equal(payload.openAIConfigured, false);
+        assert.equal(payload.imageGenerationMode, 'puter-browser-first');
+        assert.equal(payload.imageFallbackProvider, 'mock');
     } finally {
         await cleanup();
     }
@@ -187,6 +188,54 @@ test('authenticated user can save private work and publish it later', { concurre
         const storedFile = await readFile(postsFile, 'utf8');
         assert.match(storedFile, /A cinematic monsoon skyline/);
         assert.match(storedFile, /"isCommunity": true/);
+    } finally {
+        await cleanup();
+    }
+});
+
+test('authenticated user can edit the text on one of their posts', { concurrency: false }, async () => {
+    const { baseUrl, cleanup, postsFile } = await makeServer();
+
+    try {
+        const { payload } = await registerUser(baseUrl, {
+            email: 'edit-post@example.com',
+        });
+        const authHeaders = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${payload.token}`,
+        };
+
+        const createResponse = await fetch(`${baseUrl}/api/v1/post`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({
+                prompt: 'Original uploaded caption',
+                photo: 'data:image/png;base64,QUJD',
+                sourceType: 'upload',
+                isCommunity: false,
+            }),
+        });
+
+        const createdPayload = await createResponse.json();
+        assert.equal(createResponse.status, 201);
+        assert.equal(createdPayload.data.sourceType, 'upload');
+
+        const updateResponse = await fetch(`${baseUrl}/api/v1/post/${createdPayload.data._id}`, {
+            method: 'PATCH',
+            headers: authHeaders,
+            body: JSON.stringify({
+                prompt: 'Updated uploaded caption',
+            }),
+        });
+
+        const updatedPayload = await updateResponse.json();
+        assert.equal(updateResponse.status, 200);
+        assert.equal(updatedPayload.data.prompt, 'Updated uploaded caption');
+        assert.equal(updatedPayload.data.sourceType, 'upload');
+
+        const storedPosts = await readFile(postsFile, 'utf8');
+        assert.match(storedPosts, /Updated uploaded caption/);
+        assert.match(storedPosts, /"sourceType": "upload"/);
     } finally {
         await cleanup();
     }
@@ -394,6 +443,7 @@ test('oversized payloads are rejected with 413', { concurrency: false }, async (
             body: JSON.stringify({
                 prompt: 'Too large',
                 photo: `data:image/png;base64,${'A'.repeat(8 * 1024 * 1024)}`,
+                sourceType: 'upload',
                 isCommunity: true,
             }),
         });
@@ -401,6 +451,36 @@ test('oversized payloads are rejected with 413', { concurrency: false }, async (
         const responsePayload = await response.json();
         assert.equal(response.status, 413);
         assert.match(responsePayload.message, /too large/i);
+    } finally {
+        await cleanup();
+    }
+});
+
+test('non-image uploads are rejected with a validation error', { concurrency: false }, async () => {
+    const { baseUrl, cleanup } = await makeServer();
+
+    try {
+        const { payload } = await registerUser(baseUrl, {
+            email: 'bad-upload@example.com',
+        });
+
+        const response = await fetch(`${baseUrl}/api/v1/post`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${payload.token}`,
+            },
+            body: JSON.stringify({
+                prompt: 'This should fail',
+                photo: 'data:text/plain;base64,SGVsbG8=',
+                sourceType: 'upload',
+                isCommunity: false,
+            }),
+        });
+
+        const responsePayload = await response.json();
+        assert.equal(response.status, 400);
+        assert.match(responsePayload.message, /only image uploads are allowed/i);
     } finally {
         await cleanup();
     }

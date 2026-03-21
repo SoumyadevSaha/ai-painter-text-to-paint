@@ -10,6 +10,7 @@ import {
     getCommunityPosts,
     getUserPosts,
     updateLocalPostCommunityState,
+    updateLocalPostPrompt,
     updateLocalPostReaction,
 } from '../storage/localPostsStore.js';
 import {
@@ -17,36 +18,18 @@ import {
     isCloudinaryConfigured,
     uploadToCloudinary,
 } from '../utils/cloudinaryAssets.js';
+import {
+    isRemoteUrl,
+    normalizeSourceType,
+    validatePostPhoto,
+} from '../utils/postImages.js';
 
 dotenv.config();
 
 const router = express.Router();
-const DEFAULT_MAX_SOURCE_IMAGE_BYTES = 5 * 1024 * 1024;
-
-const getMaxSourceImageBytes = () => {
-    const configuredValue = Number(process.env.MAX_SOURCE_IMAGE_BYTES);
-    return Number.isFinite(configuredValue) && configuredValue > 0
-        ? configuredValue
-        : DEFAULT_MAX_SOURCE_IMAGE_BYTES;
-};
-
-const isRemoteUrl = (value) => /^https?:\/\//i.test(value);
 
 const shouldMirrorRemoteImagesToCloudinary = () =>
     process.env.CLOUDINARY_MIRROR_REMOTE_IMAGES === 'true';
-
-const estimateSourceImageBytes = (photo) => {
-    if (!photo) {
-        return 0;
-    }
-
-    if (photo.startsWith('data:')) {
-        const base64Payload = photo.split(',')[1] || '';
-        return Buffer.byteLength(base64Payload, 'base64');
-    }
-
-    return Buffer.byteLength(photo, 'utf8');
-};
 
 const serializePost = (post, viewerId = null) => {
     const postObject = post?.toObject ? post.toObject() : { ...post };
@@ -57,6 +40,7 @@ const serializePost = (post, viewerId = null) => {
 
     return {
         ...postObject,
+        sourceType: postObject.sourceType === 'upload' ? 'upload' : 'generated',
         likeCount: reactions.filter((reaction) => reaction.value === 'like').length,
         dislikeCount: reactions.filter((reaction) => reaction.value === 'dislike').length,
         viewerReaction,
@@ -97,7 +81,7 @@ router.get('/mine', requireAuth, async (req, res) => {
 
 router.route('/').post(requireAuth, async (req, res) => {
     try {
-        const { prompt, photo, isCommunity = false } = req.body;
+        const { prompt, photo, isCommunity = false, sourceType } = req.body;
 
         if (!prompt?.trim() || !photo?.trim()) {
             return res.status(400).json({
@@ -106,24 +90,28 @@ router.route('/').post(requireAuth, async (req, res) => {
             });
         }
 
+        const normalizedSourceType = normalizeSourceType(sourceType);
+        const photoValidation = validatePostPhoto({
+            photo,
+            sourceType: normalizedSourceType,
+        });
+
+        if (photoValidation) {
+            return res.status(photoValidation.statusCode).json({
+                success: false,
+                message: photoValidation.message,
+            });
+        }
+
         const normalizedPost = {
             userId: req.user._id,
             ownerName: req.user.name,
             prompt: prompt.trim(),
             photo: photo.trim(),
+            sourceType: normalizedSourceType,
             isCommunity: Boolean(isCommunity),
             reactions: [],
         };
-
-        const sourceImageBytes = estimateSourceImageBytes(normalizedPost.photo);
-        const maxSourceImageBytes = getMaxSourceImageBytes();
-
-        if (sourceImageBytes > maxSourceImageBytes) {
-            return res.status(413).json({
-                success: false,
-                message: `Image payload is too large. Maximum supported size is ${maxSourceImageBytes} bytes.`,
-            });
-        }
 
         let storedPhoto = normalizedPost.photo;
         let storedPhotoPublicId = null;
@@ -161,6 +149,44 @@ router.route('/').post(requireAuth, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to create post', error: error.message });
+    }
+});
+
+router.patch('/:postId', requireAuth, async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const normalizedPrompt = req.body.prompt?.trim();
+
+        if (!normalizedPrompt) {
+            return res.status(400).json({
+                success: false,
+                message: 'Prompt is required',
+            });
+        }
+
+        const updatedPost = isMongoReady()
+            ? await Post.findOneAndUpdate(
+                { _id: postId, userId: req.user._id },
+                { prompt: normalizedPrompt },
+                { new: true }
+            )
+            : await updateLocalPostPrompt({
+                postId,
+                userId: req.user._id,
+                prompt: normalizedPrompt,
+            });
+
+        if (!updatedPost) {
+            return res.status(404).json({ success: false, message: 'Post not found' });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Post text updated',
+            data: serializePost(updatedPost, req.user._id),
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to update post text', error: error.message });
     }
 });
 

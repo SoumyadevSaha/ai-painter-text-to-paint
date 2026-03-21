@@ -45,6 +45,7 @@ const uploadToCloudinary = async (photo, folder) => {
 
     return cloudinary.uploader.upload(photo, {
         folder,
+        resource_type: 'image',
     });
 };
 

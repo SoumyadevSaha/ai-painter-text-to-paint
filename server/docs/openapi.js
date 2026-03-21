@@ -10,7 +10,7 @@ const getOpenApiSpec = () => ({
     info: {
         title: 'VinciForge API',
         version: '1.0.0',
-        description: 'API documentation for VinciForge, including authentication, personal studio posts, community posts, and image generation.',
+        description: 'API documentation for VinciForge, including authentication, upload-first studio posts, community posts, and the mock image fallback route.',
     },
     servers: [
         {
@@ -75,6 +75,10 @@ const getOpenApiSpec = () => ({
                     prompt: { type: 'string' },
                     photo: { type: 'string' },
                     photoPublicId: { type: 'string', nullable: true },
+                    sourceType: {
+                        type: 'string',
+                        enum: ['upload', 'generated'],
+                    },
                     isCommunity: { type: 'boolean' },
                     likeCount: { type: 'integer', example: 3 },
                     dislikeCount: { type: 'integer', example: 1 },
@@ -144,7 +148,19 @@ const getOpenApiSpec = () => ({
                 properties: {
                     prompt: { type: 'string', example: 'A cinematic monsoon skyline' },
                     photo: { type: 'string', example: 'data:image/svg+xml;base64,PHN2Zy8+' },
+                    sourceType: {
+                        type: 'string',
+                        enum: ['upload', 'generated'],
+                        example: 'upload',
+                    },
                     isCommunity: { type: 'boolean', example: false },
+                },
+            },
+            UpdatePostTextRequest: {
+                type: 'object',
+                required: ['prompt'],
+                properties: {
+                    prompt: { type: 'string', example: 'A softer caption for this artwork' },
                 },
             },
             UpdateCommunityRequest: {
@@ -178,7 +194,7 @@ const getOpenApiSpec = () => ({
                     photo: { type: 'string' },
                     provider: {
                         type: 'string',
-                        enum: ['openai', 'mock'],
+                        enum: ['mock'],
                     },
                 },
             },
@@ -188,7 +204,14 @@ const getOpenApiSpec = () => ({
                     status: { type: 'string', example: 'ok' },
                     mongoConnected: { type: 'boolean' },
                     cloudinaryConfigured: { type: 'boolean' },
-                    openAIConfigured: { type: 'boolean' },
+                    imageGenerationMode: {
+                        type: 'string',
+                        example: 'puter-browser-first',
+                    },
+                    imageFallbackProvider: {
+                        type: 'string',
+                        example: 'mock',
+                    },
                     jwtConfigured: { type: 'boolean' },
                     storageMode: {
                         type: 'string',
@@ -453,6 +476,40 @@ const getOpenApiSpec = () => ({
             },
         },
         '/api/v1/post/{postId}': {
+            patch: {
+                tags: ['Posts'],
+                summary: 'Update the text attached to one of the current user posts',
+                security: [{ bearerAuth: [] }],
+                parameters: [
+                    {
+                        name: 'postId',
+                        in: 'path',
+                        required: true,
+                        schema: { type: 'string' },
+                    },
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/UpdatePostTextRequest' },
+                        },
+                    },
+                },
+                responses: {
+                    200: {
+                        description: 'Post text updated',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/PostResponse' },
+                            },
+                        },
+                    },
+                    400: { description: 'Validation error' },
+                    401: { description: 'Missing or invalid token' },
+                    404: { description: 'Post not found' },
+                },
+            },
             delete: {
                 tags: ['Posts'],
                 summary: 'Delete one of the current user posts',
@@ -518,7 +575,7 @@ const getOpenApiSpec = () => ({
         '/api/v1/dalle': {
             get: {
                 tags: ['Images'],
-                summary: 'Check image generation route status',
+                summary: 'Check mock preview image route status',
                 responses: {
                     200: {
                         description: 'Image route provider status',
@@ -527,7 +584,7 @@ const getOpenApiSpec = () => ({
             },
             post: {
                 tags: ['Images'],
-                summary: 'Generate an image from a prompt',
+                summary: 'Generate a local mock preview image from a prompt',
                 requestBody: {
                     required: true,
                     content: {
