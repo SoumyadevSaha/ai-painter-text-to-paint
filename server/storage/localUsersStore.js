@@ -72,4 +72,41 @@ const createLocalUser = async ({ name, email, passwordHash }) => {
     return newUser;
 };
 
-export { createLocalUser, findLocalUserByEmail, findLocalUserById };
+const updateLocalUserPassword = async ({ userId, passwordHash }) => {
+    const users = await readUsers();
+    const userIndex = users.findIndex((user) => user._id === userId);
+
+    if (userIndex === -1) {
+        return null;
+    }
+
+    users[userIndex] = {
+        ...users[userIndex],
+        passwordHash,
+        updatedAt: new Date().toISOString(),
+    };
+
+    await writeUsers(users);
+    return users[userIndex];
+};
+
+const deleteLocalUser = async (userId) => {
+    const users = await readUsers();
+    const userIndex = users.findIndex((user) => user._id === userId);
+
+    if (userIndex === -1) {
+        return null;
+    }
+
+    const [deletedUser] = users.splice(userIndex, 1);
+    await writeUsers(users);
+    return deletedUser;
+};
+
+export {
+    createLocalUser,
+    deleteLocalUser,
+    findLocalUserByEmail,
+    findLocalUserById,
+    updateLocalUserPassword,
+};

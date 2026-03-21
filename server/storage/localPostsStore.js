@@ -73,6 +73,7 @@ const createLocalPost = async (post) => {
     const newPost = {
         _id: randomUUID(),
         ...post,
+        photoPublicId: post.photoPublicId || null,
         reactions: Array.isArray(post.reactions) ? post.reactions : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -133,11 +134,49 @@ const updateLocalPostReaction = async ({ postId, userId, reaction }) => {
     return posts[postIndex];
 };
 
+const deleteLocalPost = async ({ postId, userId }) => {
+    const posts = await readPosts();
+    const postIndex = posts.findIndex((post) => post._id === postId && post.userId === userId);
+
+    if (postIndex === -1) {
+        return null;
+    }
+
+    const [deletedPost] = posts.splice(postIndex, 1);
+    await writePosts(posts);
+    return deletedPost;
+};
+
+const deleteLocalPostsByUser = async (userId) => {
+    const posts = await readPosts();
+    const deletedPosts = posts.filter((post) => post.userId === userId);
+    const remainingPosts = posts.filter((post) => post.userId !== userId);
+
+    await writePosts(remainingPosts);
+    return deletedPosts;
+};
+
+const removeLocalReactionsByUser = async (userId) => {
+    const posts = await readPosts();
+    const updatedPosts = posts.map((post) => ({
+        ...post,
+        reactions: Array.isArray(post.reactions)
+            ? post.reactions.filter((reaction) => reaction.userId !== userId)
+            : [],
+    }));
+
+    await writePosts(updatedPosts);
+    return updatedPosts;
+};
+
 export {
     createLocalPost,
+    deleteLocalPost,
+    deleteLocalPostsByUser,
     getCommunityPosts,
     getLocalPosts,
     getUserPosts,
+    removeLocalReactionsByUser,
     updateLocalPostCommunityState,
     updateLocalPostReaction,
 };

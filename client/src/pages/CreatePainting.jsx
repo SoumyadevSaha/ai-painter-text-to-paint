@@ -14,23 +14,79 @@ const CreatePainting = () => {
   const [form, setForm] = useState({
     prompt: '',
     photo: '',
-    isCommunity: true,
   });
-
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
+  const [savedPostId, setSavedPostId] = useState('');
   const [generatingImg, setGeneratingImg] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [providerMessage, setProviderMessage] = useState('');
+
+  const createPost = async ({ photo, isCommunity }) => {
+    const response = await authFetch('/api/v1/post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: form.prompt.trim(),
+        photo,
+        isCommunity,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.error || data?.message || 'Failed to create post');
+    }
+
+    return data.data;
+  };
+
+  const publishSavedPost = async (postId) => {
+    const response = await authFetch(`/api/v1/post/${postId}/community`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ isCommunity: true }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.error || data?.message || 'Failed to share post');
+    }
+
+    return data.data;
+  };
+
+  const finalizeGeneratedImage = async (photo, message) => {
+    setForm((currentForm) => ({ ...currentForm, photo }));
+    setSavedPostId('');
+
+    if (!saveToLibrary) {
+      setProviderMessage(message);
+      return;
+    }
+
+    try {
+      const savedPost = await createPost({ photo, isCommunity: false });
+      setSavedPostId(savedPost._id);
+      setProviderMessage(`${message} Saved to your private library.`);
+    } catch (saveError) {
+      setProviderMessage(message);
+      setError(`Image generated, but auto-save failed: ${saveError.message}`);
+    }
+  };
 
   const tryPuterFallback = async () => {
     if (!isPuterFallbackEnabled()) {
       throw new Error('No AI provider is currently available. Add OPENAI_API_KEY or enable Puter fallback.');
     }
 
-    const puterResult = await generateImageWithPuter(form.prompt.trim());
-    setProviderMessage('Image generated with Puter browser fallback.');
-    setForm((currentForm) => ({ ...currentForm, photo: puterResult.photo }));
-    return puterResult;
+    return generateImageWithPuter(form.prompt.trim());
   };
 
   const generateImage = async () => {
@@ -54,23 +110,28 @@ const CreatePainting = () => {
           throw new Error(data?.error || data?.message || 'Failed to generate image');
         }
 
+        let generatedPhoto = data.photo;
+        let nextMessage = 'AI provider unavailable, using local preview fallback.';
+
         if (data.provider === 'mock' && isPuterFallbackEnabled()) {
           try {
-            await tryPuterFallback();
+            const puterResult = await tryPuterFallback();
+            generatedPhoto = puterResult.photo;
+            nextMessage = 'Image generated with Puter browser fallback.';
+            await finalizeGeneratedImage(generatedPhoto, nextMessage);
             return;
           } catch (puterError) {
-            setProviderMessage('AI provider unavailable, using local preview fallback.');
+            nextMessage = 'AI provider unavailable, using local preview fallback.';
           }
         } else if (data.provider === 'openai') {
-          setProviderMessage('Image generated with OpenAI.');
-        } else if (data.provider === 'mock') {
-          setProviderMessage('AI provider unavailable, using local preview fallback.');
+          nextMessage = 'Image generated with OpenAI.';
         }
 
-        setForm((currentForm) => ({ ...currentForm, photo: data.photo }));
+        await finalizeGeneratedImage(generatedPhoto, nextMessage);
       } catch (error) {
         try {
-          await tryPuterFallback();
+          const puterResult = await tryPuterFallback();
+          await finalizeGeneratedImage(puterResult.photo, 'Image generated with Puter browser fallback.');
         } catch (fallbackError) {
           setError(fallbackError.message || error.message);
         }
@@ -90,22 +151,14 @@ const CreatePainting = () => {
       setLoading(true);
 
       try {
-        const response = await authFetch('/api/v1/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: form.prompt.trim(),
+        if (savedPostId) {
+          await publishSavedPost(savedPostId);
+        } else {
+          const createdPost = await createPost({
             photo: form.photo,
-            isCommunity: form.isCommunity,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.error || data?.message || 'Failed to create post');
+            isCommunity: true,
+          });
+          setSavedPostId(createdPost._id);
         }
 
         navigate('/');
@@ -120,8 +173,11 @@ const CreatePainting = () => {
   };
 
   const handleChange = (e) => {
-    const { name, type, checked, value } = e.target;
-    setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+    if (name === 'prompt') {
+      setSavedPostId('');
+    }
   };
 
   const handleSurpriseMe = () => {
@@ -135,14 +191,14 @@ const CreatePainting = () => {
         <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
           Studio Mode
         </div>
-        <h1 className='font-display gradient-text mt-5 text-4xl leading-tight sm:text-5xl'>
+        <h1 className='font-display gradient-text mt-5 pb-1 text-4xl leading-[1.08] sm:text-5xl'>
           Create something bold, warm, and worth sharing.
         </h1>
         <p className='mt-4 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>
-          Build your artwork prompt, test different providers, and publish only the frames you actually want in the gallery.
+          Build your artwork prompt, generate a frame, and decide whether it should stay in your private library or go straight to the community.
         </p>
         <p className='mt-3 text-sm leading-7 text-[#5f6776]'>
-          Signed in as <span className='font-semibold text-[#1b2235]'>{user?.name}</span>. Your creation is always saved to your studio first.
+          Signed in as <span className='font-semibold text-[#1b2235]'>{user?.name}</span>. Private saves can happen automatically as soon as the image is generated.
         </p>
 
         <div className='mt-8 space-y-4'>
@@ -173,17 +229,16 @@ const CreatePainting = () => {
 
           <label className='field-surface flex items-center justify-between gap-4 rounded-[22px] px-4 py-4'>
             <div>
-              <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#586578]'>Community Visibility</p>
+              <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#586578]'>Save to Private Library</p>
               <p className='mt-2 text-sm leading-6 text-[#5d6675]'>
-                Publish this post to the public gallery immediately after saving.
+                Automatically save each generated artwork to My Creations. Uncheck to preview without saving.
               </p>
             </div>
 
             <input
               type='checkbox'
-              name='isCommunity'
-              checked={form.isCommunity}
-              onChange={handleChange}
+              checked={saveToLibrary}
+              onChange={(event) => setSaveToLibrary(event.target.checked)}
               className='h-5 w-5 accent-[#e66a4f]'
             />
           </label>
@@ -200,23 +255,8 @@ const CreatePainting = () => {
               type='submit'
               className='btn-primary rounded-full px-6 py-3 text-sm font-semibold'
             >
-              {loading ? 'Posting...' : 'Share with Community'}
+              {loading ? 'Sharing...' : 'Share to Community'}
             </button>
-          </div>
-
-          <div className='grid gap-3 rounded-[24px] border border-[rgba(27,34,53,0.08)] bg-white/50 px-5 py-5 sm:grid-cols-3'>
-            <div>
-              <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-[#7a6c5d]'>Primary</p>
-              <p className='mt-2 text-sm text-[#5d6675]'>OpenAI through the backend when configured.</p>
-            </div>
-            <div>
-              <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-[#7a6c5d]'>Fallback</p>
-              <p className='mt-2 text-sm text-[#5d6675]'>Puter in the browser when the backend cannot generate.</p>
-            </div>
-            <div>
-              <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-[#7a6c5d]'>Safety net</p>
-              <p className='mt-2 text-sm text-[#5d6675]'>Local preview mode keeps the flow usable offline.</p>
-            </div>
           </div>
         </div>
       </form>
@@ -224,18 +264,28 @@ const CreatePainting = () => {
       <aside className='order-1 lg:order-2'>
         <div className='glass-panel sticky top-6 rounded-[34px] px-6 py-8'>
           <p className='text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a6c5d]'>Live Preview</p>
-          <h2 className='font-display mt-4 text-3xl text-[#1b2235]'>Your composition board</h2>
+          <h2 className='font-display mt-4 pb-1 text-3xl leading-[1.08] text-[#1b2235]'>Your composition board</h2>
           <p className='mt-3 text-sm leading-7 text-[#616b79]'>
             Generate first, review the framing, then publish only the image you want attached to your name.
           </p>
 
           <div className="preview-stage relative mt-8 flex min-h-[360px] items-center justify-center overflow-hidden rounded-[28px] p-5">
             {form.photo ? (
-              <img 
-                src={form.photo}
-                alt={form.prompt}
-                className='relative z-[1] h-full w-full rounded-[22px] object-contain'
-              />
+              <>
+                <img 
+                  src={form.photo}
+                  alt={form.prompt}
+                  className='relative z-[1] h-full w-full rounded-[22px] object-contain'
+                />
+                <div className='preview-caption absolute inset-x-5 bottom-5 z-[2] rounded-[22px] px-4 py-4'>
+                  <p className='text-[11px] font-bold uppercase tracking-[0.22em] text-white/70'>
+                    Created by {user?.name || 'You'}
+                  </p>
+                  <p className='mt-2 text-sm leading-6 text-white'>
+                    {form.prompt || 'Your prompt will appear here once you write one.'}
+                  </p>
+                </div>
+              </>
             ) : (
               <div className='relative z-[1] flex flex-col items-center text-center'>
                 <img 
@@ -256,14 +306,6 @@ const CreatePainting = () => {
             )}
           </div>
 
-          <div className='mt-6 space-y-3'>
-            <div className='chip rounded-[22px] px-4 py-3 text-sm'>
-              Best on desktop and mobile, with the preview staying readable at every size.
-            </div>
-            <div className='chip rounded-[22px] px-4 py-3 text-sm'>
-              Tip: specific lighting, material, and camera words usually give richer results.
-            </div>
-          </div>
         </div>
       </aside>
     </section>

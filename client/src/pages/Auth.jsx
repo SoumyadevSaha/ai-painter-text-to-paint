@@ -55,7 +55,7 @@ const Auth = () => {
         <div className='chip inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em]'>
           Creator Access
         </div>
-        <h1 className='font-display gradient-text mt-5 text-4xl leading-tight sm:text-5xl'>
+        <h1 className='font-display gradient-text mt-5 pb-1 text-4xl leading-[1.08] sm:text-5xl'>
           Sign in to save your work, keep drafts private, and publish when you are ready.
         </h1>
         <p className='mt-5 max-w-2xl text-sm leading-7 text-[#5f6776] sm:text-base'>

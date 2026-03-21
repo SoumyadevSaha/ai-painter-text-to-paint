@@ -1,28 +1,27 @@
 import express from 'express';
 import * as dotenv from 'dotenv';
-import { v2 as cloudinary } from 'cloudinary';
 
 import { isMongoReady } from '../mongodb/connect.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import Post from '../mongodb/models/post.js';
 import {
     createLocalPost,
+    deleteLocalPost,
     getCommunityPosts,
     getUserPosts,
     updateLocalPostCommunityState,
     updateLocalPostReaction,
 } from '../storage/localPostsStore.js';
+import {
+    destroyCloudinaryAsset,
+    isCloudinaryConfigured,
+    uploadToCloudinary,
+} from '../utils/cloudinaryAssets.js';
 
 dotenv.config();
 
 const router = express.Router();
 const DEFAULT_MAX_SOURCE_IMAGE_BYTES = 5 * 1024 * 1024;
-
-const isCloudinaryConfigured = () => Boolean(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-);
 
 const getMaxSourceImageBytes = () => {
     const configuredValue = Number(process.env.MAX_SOURCE_IMAGE_BYTES);
@@ -63,14 +62,6 @@ const serializePost = (post, viewerId = null) => {
         viewerReaction,
     };
 };
-
-if (isCloudinaryConfigured()) {
-    cloudinary.config({
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: process.env.CLOUDINARY_API_KEY,
-        api_secret: process.env.CLOUDINARY_API_SECRET,
-    });
-}
 
 router.route('/').get(optionalAuth, async (req, res) => {
     try {
@@ -135,16 +126,19 @@ router.route('/').post(requireAuth, async (req, res) => {
         }
 
         let storedPhoto = normalizedPost.photo;
+        let storedPhotoPublicId = null;
 
         if (isCloudinaryConfigured()) {
             const shouldUploadToCloudinary =
                 !isRemoteUrl(normalizedPost.photo) || shouldMirrorRemoteImagesToCloudinary();
 
             if (shouldUploadToCloudinary) {
-                const uploadedPhoto = await cloudinary.uploader.upload(normalizedPost.photo, {
-                    folder: process.env.CLOUDINARY_UPLOAD_FOLDER || 'ai-painter',
-                });
+                const uploadedPhoto = await uploadToCloudinary(
+                    normalizedPost.photo,
+                    process.env.CLOUDINARY_UPLOAD_FOLDER || 'ai-painter'
+                );
                 storedPhoto = uploadedPhoto.secure_url;
+                storedPhotoPublicId = uploadedPhoto.public_id || null;
             }
         }
 
@@ -152,10 +146,12 @@ router.route('/').post(requireAuth, async (req, res) => {
             ? await Post.create({
                 ...normalizedPost,
                 photo: storedPhoto,
+                photoPublicId: storedPhotoPublicId,
             })
             : await createLocalPost({
                 ...normalizedPost,
                 photo: storedPhoto,
+                photoPublicId: storedPhotoPublicId,
             });
 
         res.status(201).json({
@@ -257,6 +253,35 @@ router.post('/:postId/reaction', requireAuth, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update reaction', error: error.message });
+    }
+});
+
+router.delete('/:postId', requireAuth, async (req, res) => {
+    try {
+        const { postId } = req.params;
+
+        const existingPost = isMongoReady()
+            ? await Post.findOne({ _id: postId, userId: req.user._id })
+            : (await getUserPosts(req.user._id)).find((post) => post._id === postId) || null;
+
+        if (!existingPost) {
+            return res.status(404).json({ success: false, message: 'Post not found' });
+        }
+
+        await destroyCloudinaryAsset({
+            photo: existingPost.photo,
+            photoPublicId: existingPost.photoPublicId,
+        });
+
+        if (isMongoReady()) {
+            await Post.deleteOne({ _id: postId, userId: req.user._id });
+        } else {
+            await deleteLocalPost({ postId, userId: req.user._id });
+        }
+
+        res.status(200).json({ success: true, message: 'Post deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to delete post', error: error.message });
     }
 });
 

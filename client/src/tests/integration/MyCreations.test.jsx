@@ -58,8 +58,8 @@ describe('MyCreations page', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Share to Community')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Share to Community' }));
+    expect(await screen.findByText('Share')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
 
     await waitFor(() => {
       expect(authFetch).toHaveBeenNthCalledWith(2, '/api/v1/post/post-1/community', {
@@ -71,7 +71,55 @@ describe('MyCreations page', () => {
       });
     });
 
-    expect(await screen.findByText('Remove from Community')).toBeInTheDocument();
+    expect(await screen.findByText('Unshare')).toBeInTheDocument();
     expect(screen.getByText('Public')).toBeInTheDocument();
+  });
+
+  it('lets the creator delete one of their studio posts', async () => {
+    const authFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              _id: 'post-2',
+              ownerName: 'Soumyadev',
+              prompt: 'A removable artwork',
+              photo: 'data:image/svg+xml;base64,PHN2Zy8+',
+              isCommunity: true,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          message: 'Post deleted successfully',
+        }),
+      });
+
+    mockUseAuth.mockReturnValue({
+      authFetch,
+      user: { _id: 'user-1', name: 'Soumyadev' },
+    });
+
+    render(
+      <MemoryRouter>
+        <MyCreations />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Delete')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(authFetch).toHaveBeenNthCalledWith(2, '/api/v1/post/post-2', {
+        method: 'DELETE',
+      });
+    });
+
+    expect(await screen.findByText('No creations yet')).toBeInTheDocument();
   });
 });
